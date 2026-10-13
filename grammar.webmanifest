@@ -1,0 +1,15 @@
+{
+  "name": "Korean 5B 문법·표현",
+  "short_name": "5B 문법",
+  "description": "Sogang Korean 5B grammar and expressions, explained in your language",
+  "id": "./grammar.html",
+  "start_url": "./grammar.html",
+  "scope": "./grammar.html",
+  "display": "standalone",
+  "background_color": "#0f1420",
+  "theme_color": "#0f1420",
+  "icons": [
+    { "src": "icon-grammar-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-grammar-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
