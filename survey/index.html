@@ -7,71 +7,142 @@
 <title>가장 많이 사용하는 AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <style>
-:root{--ground:#eef1f7;--card:#fff;--ink:#1b2240;--muted:#5d6584;--line:#d5dae8;
-  --b1:#c8445e;--b2:#3e63c9;--b3:#2f9b7a}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ground:#11142a;--card:#1a1e38;--ink:#eef0fa;--muted:#a3a9c6;--line:#2e3457;--b1:#f0728b;--b2:#7c9bf0;--b3:#5cc9a5}}
-:root[data-theme="dark"]{--ground:#11142a;--card:#1a1e38;--ink:#eef0fa;--muted:#a3a9c6;--line:#2e3457;--b1:#f0728b;--b2:#7c9bf0;--b3:#5cc9a5}
+/* Option 1 · 리포트: one white report sheet, a key-finding band, two figures side by side */
+:root{
+  --page:#f2f4f7;--sheet:#ffffff;--ink:#141a26;--ink-2:#4a5468;--muted:#6b7487;
+  --rule:#dfe3ea;--grid:#e9ecf1;--axis:#9aa3b2;--hl:#eaf6f1;
+  --c1:#1baf7a;--c2:#2a78d6;--c3:#eb6834;
+  --sans:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --page:#0e121a;--sheet:#171b26;--ink:#eef1f6;--ink-2:#b9c0cd;--muted:#8f98a8;
+  --rule:#2a3140;--grid:#232a37;--axis:#5c6576;--hl:#132a25;
+  --c1:#199e70;--c2:#3987e5;--c3:#d95926;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#0e121a;--sheet:#171b26;--ink:#eef1f6;--ink-2:#b9c0cd;--muted:#8f98a8;
+  --rule:#2a3140;--grid:#232a37;--axis:#5c6576;--hl:#132a25;
+  --c1:#199e70;--c2:#3987e5;--c3:#d95926;color-scheme:dark}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans KR",system-ui,sans-serif;
-  min-height:100vh;display:grid;place-items:center;padding:24px 16px;word-break:keep-all}
-.sheet{width:min(1100px,100%);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:clamp(20px,4vw,48px)}
-h1{font-family:"Gowun Batang",serif;font-size:clamp(24px,4vw,40px);text-wrap:balance;line-height:1.3}
-.sub{color:var(--muted);margin-top:6px;font-size:clamp(14px,1.8vw,18px)}
-.split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,4vw,48px);margin-top:clamp(20px,4vh,40px)}
-.panel h2{font-size:15px;letter-spacing:.08em;color:var(--muted);margin-bottom:16px;font-weight:700}
-.pie{width:min(260px,70vw);aspect-ratio:1;border-radius:50%;margin:0 auto 20px;
-  background:conic-gradient(var(--b1) 0 87%,var(--b3) 87% 95.7%,var(--b2) 95.7% 100%)}
-.legend,.bars{list-style:none;display:grid;gap:10px;font-variant-numeric:tabular-nums;font-size:clamp(15px,1.9vw,19px)}
-.legend li{display:grid;grid-template-columns:16px 1fr auto;gap:10px;align-items:center}
-.legend i{width:16px;height:16px;border-radius:3px;border:1px solid var(--line)}
-.bars li{display:grid;grid-template-columns:6.5em 1fr 3.6em;gap:10px;align-items:center}
-.track{height:26px;background:var(--ground);border-radius:3px;overflow:hidden}
-.bar{height:100%;border-radius:3px}
-.bars b,.legend b{text-align:right}
-.dim{color:var(--muted)}
-.foot{margin-top:28px;padding-top:12px;border-top:1px dashed var(--line);color:var(--muted);font-size:14px}
-.deck-link{position:fixed;right:16px;bottom:16px;background:var(--card);color:var(--ink);border:1px solid var(--line);
-  border-radius:999px;padding:10px 18px;font-size:15px;font-weight:700;text-decoration:none;box-shadow:0 2px 10px rgb(0 0 0 / .12)}
-.deck-link:hover{border-color:var(--b1);color:var(--b1)}
-.deck-link:focus-visible{outline:3px solid var(--b1);outline-offset:2px}
-@media (min-width:701px){body{padding-bottom:76px}}
-@media (max-width:700px){.split{grid-template-columns:1fr}
-  .deck-link{position:static;justify-self:end;margin-top:14px}}
-@media print{:root,:root[data-theme="dark"],:root:not([data-theme="light"]){--ground:#eef1f7;--card:#fff;--ink:#1b2240;--muted:#5d6584;--line:#d5dae8;--b1:#c8445e;--b2:#3e63c9;--b3:#2f9b7a}
-  body{background:#fff;min-height:0;padding-bottom:24px}.sheet{border:0}.deck-link{display:none}
-  .pie,.bar,.legend i{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+body{background:var(--page);color:var(--ink);font-family:var(--sans);word-break:keep-all;
+  padding:32px max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px))}
+.sheet{max-width:1080px;margin:0 auto;background:var(--sheet);border:1px solid var(--rule);border-radius:4px;
+  padding:clamp(22px,4.5vw,52px);display:grid;gap:clamp(22px,3.5vw,36px)}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:.14em;color:var(--muted)}
+h1{font-size:clamp(26px,3.6vw,38px);font-weight:700;line-height:1.3;text-wrap:balance;margin-top:6px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:16px;padding-top:16px;border-top:1px solid var(--rule)}
+.meta div{display:flex;gap:8px;align-items:baseline;font-size:15px}
+.meta dt{color:var(--muted)}
+.meta dd{font-weight:500;font-variant-numeric:tabular-nums}
+.key{display:flex;align-items:center;gap:clamp(16px,3vw,32px);background:var(--hl);border-radius:4px;padding:clamp(16px,3vw,26px) clamp(18px,3vw,30px);flex-wrap:wrap}
+.key-num{font-size:clamp(44px,7vw,64px);font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.key-text{font-size:clamp(16px,2vw,19px);line-height:1.6;color:var(--ink-2);min-width:0;flex:1 1 260px}
+.key-text strong{color:var(--ink)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:clamp(22px,4vw,48px)}
+figure{display:grid;gap:18px;align-content:start;min-width:0}
+figcaption{font-size:14px;font-weight:700;color:var(--ink-2);padding-bottom:10px;border-bottom:1px solid var(--rule)}
+figcaption span{font-weight:400;color:var(--muted)}
+/* donut */
+.pie{display:flex;align-items:center;gap:clamp(16px,3vw,28px);flex-wrap:wrap}
+.donut{width:min(200px,52vw);height:auto;flex:none}
+.donut circle{fill:none;stroke-width:32}
+.s1{stroke:var(--c1)}.s2{stroke:var(--c2)}.s3{stroke:var(--c3)}
+.d-num{font:700 30px var(--sans);fill:var(--ink)}
+.d-lab{font:400 14px var(--sans);fill:var(--muted)}
+.legend{list-style:none;display:grid;gap:9px;flex:1 1 180px;min-width:0;font-size:15px;font-variant-numeric:tabular-nums}
+.legend li{display:grid;grid-template-columns:12px 1fr auto auto;gap:10px;align-items:center}
+.legend i{width:12px;height:12px;border-radius:3px;background:var(--c)}
+.legend .n{color:var(--muted)}
+.legend b{min-width:3.4em;text-align:right}
+.legend .zero{color:var(--muted)}
+.legend .zero i{background:none;border:1px solid var(--axis)}
+/* bars */
+.bars{display:grid;font-size:15px}
+.brow{display:grid;grid-template-columns:6.6em minmax(0,1fr);column-gap:12px;align-items:center}
+.plot{position:relative;height:42px;margin-right:3.6em;
+  background-image:linear-gradient(to right,var(--grid) 1px,transparent 1px);background-size:25% 100%;box-shadow:inset -1px 0 0 var(--grid)}
+.plot::before{content:"";position:absolute;left:0;top:0;bottom:0;width:1px;background:var(--axis)}
+.bar{position:absolute;left:1px;top:50%;height:22px;width:calc(var(--w) - 1px);transform:translateY(-50%);border-radius:0 4px 4px 0;background:var(--c)}
+.val{position:absolute;left:calc(var(--w) + 8px);top:50%;transform:translateY(-50%);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.zero{color:var(--muted)}
+.zero .val{font-weight:400}
+.ticks .plot{height:22px;background:none;box-shadow:none}
+.ticks .plot::before{display:none}
+.ticks span{position:absolute;left:var(--w);transform:translateX(-50%);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.foot{display:grid;gap:6px;padding-top:16px;border-top:1px solid var(--rule);font-size:15px;color:var(--ink-2);line-height:1.6}
+.foot .src{font-size:13px;color:var(--muted)}
+.deck-link{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:max(16px,env(safe-area-inset-bottom,0px));
+  background:var(--ink);color:var(--sheet);border-radius:4px;padding:11px 18px;font:700 15px var(--sans);text-decoration:none;box-shadow:0 4px 14px rgb(0 0 0 / .18)}
+.deck-link:hover{background:var(--c2);color:#fff}
+.deck-link:focus-visible{outline:3px solid var(--c2);outline-offset:3px}
+@media (min-width:761px){body{padding-bottom:84px}}
+@media (max-width:760px){.split{grid-template-columns:minmax(0,1fr)}
+  .deck-link{position:static;display:table;margin:16px 0 0 auto}}
+@media print{
+  :root,:root[data-theme="dark"],:root:not([data-theme="light"]){--page:#fff;--sheet:#fff;--ink:#141a26;--ink-2:#4a5468;--muted:#6b7487;
+    --rule:#dfe3ea;--grid:#e9ecf1;--axis:#9aa3b2;--hl:#eaf6f1;--c1:#1baf7a;--c2:#2a78d6;--c3:#eb6834;color-scheme:light}
+  body{padding:0}.sheet{border:0}.deck-link{display:none}
+  .key,.bar,.legend i,.donut{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style>
 </head>
 <body>
 <main class="sheet">
-  <h1>가장 많이 사용하는 AI는 무엇입니까?</h1>
-  <p class="sub">설문 대상: 23명 (남자 4명, 여자 19명)</p>
+  <header>
+    <p class="eyebrow">설문 조사 결과</p>
+    <h1>가장 많이 사용하는 AI는 무엇입니까?</h1>
+    <dl class="meta">
+      <div><dt>응답자</dt><dd>23명</dd></div>
+      <div><dt>성별</dt><dd>남자 4명 · 여자 19명</dd></div>
+      <div><dt>응답 방식</dt><dd>한 가지만 선택</dd></div>
+    </dl>
+  </header>
+
+  <section class="key" aria-label="핵심 결과">
+    <p class="key-num">87.0%</p>
+    <p class="key-text">응답자 23명 중 20명이 <strong>챗지피티</strong>를 가장 많이 사용한다고 답했습니다.</p>
+  </section>
+
   <div class="split">
-    <section class="panel">
-      <h2>① 원그래프</h2>
-      <div class="pie" role="img" aria-label="챗지피티 87.0%, 제미나이 8.7%, 클로드 4.3%"></div>
-      <ul class="legend">
-        <li><i style="background:var(--b1)"></i><span>챗지피티</span><b>20명 · 87.0%</b></li>
-        <li><i style="background:var(--b3)"></i><span>제미나이</span><b>2명 · 8.7%</b></li>
-        <li><i style="background:var(--b2)"></i><span>클로드</span><b>1명 · 4.3%</b></li>
-        <li class="dim"><i></i><span>딥시크</span><b>0명 · 0%</b></li>
-        <li class="dim"><i></i><span>AI 사용 안 함</span><b>0명 · 0%</b></li>
-      </ul>
-    </section>
-    <section class="panel">
-      <h2>② 막대그래프</h2>
-      <ul class="bars">
-        <li><span>챗지피티</span><div class="track"><div class="bar" style="width:87%;background:var(--b1)"></div></div><b>87.0%</b></li>
-        <li><span>제미나이</span><div class="track"><div class="bar" style="width:8.7%;background:var(--b3)"></div></div><b>8.7%</b></li>
-        <li><span>클로드</span><div class="track"><div class="bar" style="width:4.3%;background:var(--b2)"></div></div><b>4.3%</b></li>
-        <li class="dim"><span>딥시크</span><div class="track"></div><b>0%</b></li>
-        <li class="dim"><span>사용 안 함</span><div class="track"></div><b>0%</b></li>
-      </ul>
-    </section>
+    <figure>
+      <figcaption>원그래프 <span>· 응답 비율</span></figcaption>
+      <div class="pie">
+        <svg class="donut" viewBox="0 0 200 200" role="img" aria-label="원그래프: 챗지피티 87.0%, 제미나이 8.7%, 클로드 4.3%, 딥시크 0%, AI 사용 안 함 0%">
+          <g transform="rotate(-90 100 100)">
+            <circle class="s1" cx="100" cy="100" r="70" pathLength="100" stroke-dasharray="86.16 100" stroke-dashoffset="-0.4"><title>챗지피티 20명 · 87.0%</title></circle>
+            <circle class="s2" cx="100" cy="100" r="70" pathLength="100" stroke-dasharray="7.89 100" stroke-dashoffset="-87.36"><title>제미나이 2명 · 8.7%</title></circle>
+            <circle class="s3" cx="100" cy="100" r="70" pathLength="100" stroke-dasharray="3.55 100" stroke-dashoffset="-96.05"><title>클로드 1명 · 4.3%</title></circle>
+          </g>
+          <text class="d-num" x="100" y="102" text-anchor="middle">23명</text>
+          <text class="d-lab" x="100" y="124" text-anchor="middle">응답자</text>
+        </svg>
+        <ul class="legend">
+          <li style="--c:var(--c1)"><i></i><span>챗지피티</span><span class="n">20명</span><b>87.0%</b></li>
+          <li style="--c:var(--c2)"><i></i><span>제미나이</span><span class="n">2명</span><b>8.7%</b></li>
+          <li style="--c:var(--c3)"><i></i><span>클로드</span><span class="n">1명</span><b>4.3%</b></li>
+          <li class="zero"><i></i><span>딥시크</span><span class="n">0명</span><b>0%</b></li>
+          <li class="zero"><i></i><span>AI 사용 안 함</span><span class="n">0명</span><b>0%</b></li>
+        </ul>
+      </div>
+    </figure>
+
+    <figure>
+      <figcaption>막대그래프 <span>· 응답 비율 (%)</span></figcaption>
+      <div class="bars" role="img" aria-label="막대그래프: 챗지피티 87.0%, 제미나이 8.7%, 클로드 4.3%, 딥시크 0%, AI 사용 안 함 0%">
+        <div class="brow"><span>챗지피티</span><div class="plot"><i class="bar" style="--w:86.96%;--c:var(--c1)" title="챗지피티 20명 · 87.0%"></i><b class="val" style="--w:86.96%">87.0%</b></div></div>
+        <div class="brow"><span>제미나이</span><div class="plot"><i class="bar" style="--w:8.70%;--c:var(--c2)" title="제미나이 2명 · 8.7%"></i><b class="val" style="--w:8.70%">8.7%</b></div></div>
+        <div class="brow"><span>클로드</span><div class="plot"><i class="bar" style="--w:4.35%;--c:var(--c3)" title="클로드 1명 · 4.3%"></i><b class="val" style="--w:4.35%">4.3%</b></div></div>
+        <div class="brow zero"><span>딥시크</span><div class="plot"><b class="val" style="--w:0%">0%</b></div></div>
+        <div class="brow zero"><span>사용 안 함</span><div class="plot"><b class="val" style="--w:0%">0%</b></div></div>
+        <div class="brow ticks" aria-hidden="true"><span></span><div class="plot"><span style="--w:0%">0</span><span style="--w:25%">25</span><span style="--w:50%">50</span><span style="--w:75%">75</span><span style="--w:100%">100</span></div></div>
+      </div>
+    </figure>
   </div>
-  <p class="foot">23명 중 챗지피티 20명, 제미나이 2명, 클로드 1명, 딥시크 0명, AI 사용 안 함 0명</p>
+
+  <footer class="foot">
+    <p>23명 중 챗지피티 20명, 제미나이 2명, 클로드 1명, 딥시크 0명, AI 사용 안 함 0명</p>
+    <p class="src">자료: 직접 설문 조사 (n = 23)</p>
+  </footer>
 </main>
 <a class="deck-link" href="presentatie/">발표 자료 보기 →</a>
 </body>
