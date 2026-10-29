@@ -45,11 +45,14 @@ figcaption{font-size:14px;font-weight:700;color:var(--ink-2);padding-bottom:10px
 figcaption span{font-weight:400;color:var(--muted)}
 /* donut */
 .pie{display:flex;align-items:center;gap:clamp(16px,3vw,28px);flex-wrap:wrap}
-.donut{width:min(200px,52vw);height:auto;flex:none}
+.donut{width:min(224px,58vw);height:auto;flex:none}
 .donut circle{fill:none;stroke-width:32}
 .s1{stroke:var(--c1)}.s2{stroke:var(--c2)}.s3{stroke:var(--c3)}
 .d-num{font:700 30px var(--sans);fill:var(--ink)}
 .d-lab{font:400 14px var(--sans);fill:var(--muted)}
+.d-in{font:700 13px var(--sans);fill:#0b0b0b}
+.d-out{font:700 12.5px var(--sans);fill:var(--ink)}
+.lead{stroke:var(--axis);stroke-width:1}
 .legend{list-style:none;display:grid;gap:9px;flex:1 1 180px;min-width:0;font-size:15px;font-variant-numeric:tabular-nums}
 .legend li{display:grid;grid-template-columns:12px 1fr auto auto;gap:10px;align-items:center}
 .legend i{width:12px;height:12px;border-radius:3px;background:var(--c)}
@@ -107,11 +110,18 @@ figcaption span{font-weight:400;color:var(--muted)}
     <figure>
       <figcaption>원그래프 <span>· 응답 비율</span></figcaption>
       <div class="pie">
-        <svg class="donut" viewBox="0 0 200 200" role="img" aria-label="원그래프: 챗지피티 87.0%, 제미나이 8.7%, 클로드 4.3%, 딥시크 0%, AI 사용 안 함 0%">
+        <svg class="donut" viewBox="-4 -24 208 228" role="img" aria-label="원그래프: 챗지피티 87.0%, 제미나이 8.7%, 클로드 4.3%, 딥시크 0%, AI 사용 안 함 0%">
           <g transform="rotate(-90 100 100)">
             <circle class="s1" cx="100" cy="100" r="70" pathLength="100" stroke-dasharray="86.16 100" stroke-dashoffset="-0.4"><title>챗지피티 20명 · 87.0%</title></circle>
             <circle class="s2" cx="100" cy="100" r="70" pathLength="100" stroke-dasharray="7.89 100" stroke-dashoffset="-87.36"><title>제미나이 2명 · 8.7%</title></circle>
             <circle class="s3" cx="100" cy="100" r="70" pathLength="100" stroke-dasharray="3.55 100" stroke-dashoffset="-96.05"><title>클로드 1명 · 4.3%</title></circle>
+          </g>
+          <g class="d-labels" aria-hidden="true">
+            <text class="d-in" x="100" y="170" text-anchor="middle" dominant-baseline="central">87.0%</text>
+            <line class="lead" x1="54.3" y1="24.8" x2="49.6" y2="17.1"/>
+            <text class="d-out" x="47" y="12" text-anchor="end" dominant-baseline="central">8.7%</text>
+            <line class="lead" x1="88.0" y1="12.8" x2="86.8" y2="3.9"/>
+            <text class="d-out" x="86" y="-6" text-anchor="middle" dominant-baseline="central">4.3%</text>
           </g>
           <text class="d-num" x="100" y="102" text-anchor="middle">23명</text>
           <text class="d-lab" x="100" y="124" text-anchor="middle">응답자</text>
