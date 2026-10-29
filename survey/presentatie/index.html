@@ -81,6 +81,10 @@ mark{background:var(--mark);color:inherit;padding:0 .15em;border-radius:3px}
 .gtable span{font-size:clamp(14px,1.8vw,19px);line-height:1.6}
 .fun{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .fun div{background:var(--ground);border-radius:6px;padding:14px 16px;font-size:clamp(15px,1.9vw,19px);line-height:1.6}
+/* full story */
+.story-slide{padding-block:clamp(22px,4vw,46px);gap:clamp(12px,2vh,20px)}
+.story{display:grid;gap:10px;max-width:72ch}
+.story p{font-size:clamp(15px,1.6vw,18px);line-height:1.75}
 /* chrome */
 .bottom{position:fixed;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;justify-content:center;gap:14px;color:var(--muted);font-size:14px}
 .bottom button{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px;
@@ -188,6 +192,18 @@ mark{background:var(--mark);color:inherit;padding:0 .15em;border-radius:3px}
     <div><span>결과 분석하기</span><span>이러한 결과를 통해 -다는 것을 알 수 있었습니다</span></div>
   </div>
   <p class="pattern">※ -(으)로 나타났습니다: 설문 결과에서 눈에 띄는 점을 말할 때 자주 써요.</p>
+</section>
+
+<section class="slide story-slide">
+  <div class="kicker">전체 발표 예시</div>
+  <h2>가장 많이 사용하는 AI</h2>
+  <div class="story">
+    <p>제가 23명(남자 4명, 여자 19명)<mark>을 대상으로</mark> 가장 많이 사용하는 AI<mark>에 대해 설문 조사한 결과는 다음과 같습니다</mark>. 조사 결과, 챗지피티<mark>가</mark> 87.0%(20명)<mark>로 가장 많았습니다</mark>. 응답자 열 명 중 약 아홉 명이 챗지피티를 가장 많이 사용하는 것<mark>으로 나타났습니다</mark>.</p>
+    <p><mark>그 다음으로는</mark> 제미나이<mark>가</mark> 8.7%(2명), 클로드<mark>가</mark> 4.3%(1명)<mark>의 순이었습니다</mark>. 두 AI를 합해도 13.0%밖에 되지 않아 챗지피티와 큰 차이를 보였습니다.</p>
+    <p>한편 딥시크를 사용한<mark>다는 응답</mark>은 한 명도 없었고, AI를 사용하지 않는<mark>다는 응답</mark>도 한 명도 없었습니다.</p>
+    <p><mark>이러한 결과를 통해</mark> 대부분의 사람이 챗지피티를 사용한<mark>다는 것을 알 수 있었습니다</mark>. 또한 설문에 참여한 모든 사람이 AI를 사용<mark>함을 알 수 있었습니다</mark>. 챗지피티가 다른 AI보다 먼저 널리 알려졌기 때문이 아닐까 생각합니다.</p>
+  </div>
+  <p class="pattern"><b>참고</b> 교과서 「한국인이 좋아하는 숫자」처럼 숫자를 괄호 안에 넣고, 1위 → 2위 이하 → 기타 → 분석 순서로 말했습니다.</p>
 </section>
 
 <section class="slide title-slide">
