@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>가장 많이 사용하는 AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=IBM+Plex+Sans+KR:wght@400;700&display=swap">
+<style>
+:root{--ground:#eef1f7;--card:#fff;--ink:#1b2240;--muted:#5d6584;--line:#d5dae8;
+  --b1:#c8445e;--b2:#3e63c9;--b3:#2f9b7a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ground:#11142a;--card:#1a1e38;--ink:#eef0fa;--muted:#a3a9c6;--line:#2e3457;--b1:#f0728b;--b2:#7c9bf0;--b3:#5cc9a5}}
+:root[data-theme="dark"]{--ground:#11142a;--card:#1a1e38;--ink:#eef0fa;--muted:#a3a9c6;--line:#2e3457;--b1:#f0728b;--b2:#7c9bf0;--b3:#5cc9a5}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans KR",system-ui,sans-serif;
+  min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+.sheet{width:min(1100px,100%);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:clamp(20px,4vw,48px)}
+h1{font-family:"Gowun Batang",serif;font-size:clamp(24px,4vw,40px);text-wrap:balance;line-height:1.3}
+.sub{color:var(--muted);margin-top:6px;font-size:clamp(14px,1.8vw,18px)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,4vw,48px);margin-top:clamp(20px,4vh,40px)}
+.panel h2{font-size:15px;letter-spacing:.08em;color:var(--muted);margin-bottom:16px;font-weight:700}
+.pie{width:min(260px,70vw);aspect-ratio:1;border-radius:50%;margin:0 auto 20px;
+  background:conic-gradient(var(--b1) 0 87%,var(--b3) 87% 95.7%,var(--b2) 95.7% 100%)}
+.legend,.bars{list-style:none;display:grid;gap:10px;font-variant-numeric:tabular-nums;font-size:clamp(15px,1.9vw,19px)}
+.legend li{display:grid;grid-template-columns:16px 1fr auto;gap:10px;align-items:center}
+.legend i{width:16px;height:16px;border-radius:3px;border:1px solid var(--line)}
+.bars li{display:grid;grid-template-columns:6.5em 1fr 3.6em;gap:10px;align-items:center}
+.track{height:26px;background:var(--ground);border-radius:3px;overflow:hidden}
+.bar{height:100%;border-radius:3px}
+.bars b,.legend b{text-align:right}
+.dim{color:var(--muted)}
+.foot{margin-top:28px;padding-top:12px;border-top:1px dashed var(--line);color:var(--muted);font-size:14px}
+@media (max-width:700px){.split{grid-template-columns:1fr}}
+@media print{:root,:root[data-theme="dark"],:root:not([data-theme="light"]){--ground:#eef1f7;--card:#fff;--ink:#1b2240;--muted:#5d6584;--line:#d5dae8;--b1:#c8445e;--b2:#3e63c9;--b3:#2f9b7a}
+  body{background:#fff;min-height:0}.sheet{border:0}
+  .pie,.bar,.legend i{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<main class="sheet">
+  <h1>가장 많이 사용하는 AI는 무엇입니까?</h1>
+  <p class="sub">설문 대상: 23명 (남자 4명, 여자 19명)</p>
+  <div class="split">
+    <section class="panel">
+      <h2>① 원그래프</h2>
+      <div class="pie" role="img" aria-label="챗지피티 87.0%, 제미나이 8.7%, 클로드 4.3%"></div>
+      <ul class="legend">
+        <li><i style="background:var(--b1)"></i><span>챗지피티</span><b>20명 · 87.0%</b></li>
+        <li><i style="background:var(--b3)"></i><span>제미나이</span><b>2명 · 8.7%</b></li>
+        <li><i style="background:var(--b2)"></i><span>클로드</span><b>1명 · 4.3%</b></li>
+        <li class="dim"><i></i><span>딥시크</span><b>0명 · 0%</b></li>
+        <li class="dim"><i></i><span>AI 사용 안 함</span><b>0명 · 0%</b></li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h2>② 막대그래프</h2>
+      <ul class="bars">
+        <li><span>챗지피티</span><div class="track"><div class="bar" style="width:87%;background:var(--b1)"></div></div><b>87.0%</b></li>
+        <li><span>제미나이</span><div class="track"><div class="bar" style="width:8.7%;background:var(--b3)"></div></div><b>8.7%</b></li>
+        <li><span>클로드</span><div class="track"><div class="bar" style="width:4.3%;background:var(--b2)"></div></div><b>4.3%</b></li>
+        <li class="dim"><span>딥시크</span><div class="track"></div><b>0%</b></li>
+        <li class="dim"><span>사용 안 함</span><div class="track"></div><b>0%</b></li>
+      </ul>
+    </section>
+  </div>
+  <p class="foot">23명 중 챗지피티 20명, 제미나이 2명, 클로드 1명, 딥시크 0명, AI 사용 안 함 0명</p>
+</main>
+</body>
+</html>
