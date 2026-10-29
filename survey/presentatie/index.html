@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>우리 반의 AI 사용 습관</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+:root{
+  --ground:#eef1f7; --card:#ffffff; --ink:#1b2240; --muted:#5d6584; --line:#d5dae8;
+  --accent:#c8445e; --accent-soft:#f7dde3; --mark:#ffe9a8;
+  --b1:#c8445e; --b2:#3e63c9; --b3:#2f9b7a; --b4:#d08a22; --b5:#8c93ad;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#11142a; --card:#1a1e38; --ink:#eef0fa; --muted:#a3a9c6; --line:#2e3457;
+    --accent:#f0728b; --accent-soft:#3a2033; --mark:#5a4a14;
+    --b1:#f0728b; --b2:#7c9bf0; --b3:#5cc9a5; --b4:#efb257; --b5:#8e95b3;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#11142a; --card:#1a1e38; --ink:#eef0fa; --muted:#a3a9c6; --line:#2e3457;
+  --accent:#f0728b; --accent-soft:#3a2033; --mark:#5a4a14;
+  --b1:#f0728b; --b2:#7c9bf0; --b3:#5cc9a5; --b4:#efb257; --b5:#8e95b3;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{word-break:keep-all}
+
+html,body{height:100%}
+body{background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans KR",system-ui,sans-serif;
+  overflow:hidden;-webkit-tap-highlight-color:transparent}
+.deck{position:fixed;inset:0;display:grid;place-items:center;padding:16px}
+.slide{position:absolute;width:min(1100px,calc(100vw - 32px));height:min(640px,calc(100dvh - 96px));
+  background:var(--card);border:1px solid var(--line);border-radius:6px;
+  padding:clamp(22px,5vw,64px);display:flex;flex-direction:column;gap:clamp(14px,2.4vh,28px);
+  opacity:0;transform:translateX(40px);pointer-events:none;transition:opacity .45s ease,transform .45s ease;overflow:auto}
+.slide.on{opacity:1;transform:none;pointer-events:auto}
+.slide.past{transform:translateX(-40px)}
+.kicker{font-size:clamp(12px,1.6vw,15px);letter-spacing:.12em;color:var(--accent);font-weight:700}
+h1,h2{font-family:"Gowun Batang",serif;font-weight:700;text-wrap:balance;line-height:1.3}
+h1{font-size:clamp(30px,5.6vw,60px)}
+h2{font-size:clamp(24px,3.8vw,40px)}
+p,li{font-size:clamp(17px,2.2vw,24px);line-height:1.75}
+.lead{color:var(--muted)}
+.say{border-left:4px solid var(--accent);padding:6px 0 6px 18px;font-size:clamp(19px,2.6vw,28px);line-height:1.7}
+.say + .say{margin-top:4px}
+mark{background:var(--mark);color:inherit;padding:0 .15em;border-radius:3px}
+.pattern{font-size:clamp(13px,1.6vw,16px);color:var(--muted);margin-top:auto;border-top:1px dashed var(--line);padding-top:12px}
+.pattern b{color:var(--accent);font-weight:500}
+.title-slide{justify-content:center}
+.title-slide .who{margin-top:12px;color:var(--muted);font-size:clamp(15px,1.9vw,19px)}
+.meta{display:flex;gap:12px;flex-wrap:wrap}
+.chip{background:var(--accent-soft);color:var(--ink);border-radius:999px;padding:6px 16px;font-size:clamp(14px,1.8vw,18px)}
+/* chart */
+.chart{display:grid;gap:clamp(8px,1.6vh,14px);font-variant-numeric:tabular-nums}
+.row{display:grid;grid-template-columns:minmax(110px,10em) 1fr 3.5em;align-items:center;gap:12px;font-size:clamp(15px,2vw,21px)}
+.track{height:clamp(18px,3.4vh,30px);background:var(--ground);border-radius:3px;overflow:hidden}
+.bar{height:100%;width:0;border-radius:3px;transition:width 1s cubic-bezier(.2,.7,.2,1)}
+.on .bar{width:var(--w)}
+.row .pct{text-align:right;font-weight:700}
+.row.dim{color:var(--muted)}
+/* pie */
+.pie-wrap{display:flex;align-items:center;gap:clamp(20px,5vw,60px);flex-wrap:wrap}
+.pie{width:clamp(170px,30vh,280px);aspect-ratio:1;border-radius:50%;flex:none;
+  background:conic-gradient(var(--b1) 0 87%,var(--b3) 87% 95.7%,var(--b2) 95.7% 100%);
+  border:3px solid var(--card);box-shadow:0 0 0 1px var(--line);
+  transform:scale(.6) rotate(-90deg);opacity:0;transition:transform .9s cubic-bezier(.2,.7,.2,1),opacity .6s}
+.on .pie{transform:none;opacity:1}
+.legend{list-style:none;display:grid;gap:10px;font-variant-numeric:tabular-nums}
+.legend li{display:grid;grid-template-columns:18px 7.5em auto;align-items:center;gap:10px;font-size:clamp(15px,2vw,21px)}
+.legend i{width:18px;height:18px;border-radius:3px;background:var(--ground);border:1px solid var(--line)}
+.legend b{font-weight:700}
+.legend .dim{color:var(--muted)}
+/* grammar table */
+.gtable{display:grid;gap:0;border-top:2px solid var(--accent)}
+.gtable div{display:grid;grid-template-columns:minmax(120px,15em) 1fr;gap:16px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.gtable span:first-child{font-weight:700}
+.gtable span{font-size:clamp(14px,1.8vw,19px);line-height:1.6}
+.fun{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.fun div{background:var(--ground);border-radius:6px;padding:14px 16px;font-size:clamp(15px,1.9vw,19px);line-height:1.6}
+/* chrome */
+.bottom{position:fixed;left:0;right:0;bottom:0;height:56px;display:flex;align-items:center;justify-content:center;gap:14px;color:var(--muted);font-size:14px}
+.bottom button{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px;
+  width:44px;height:44px;font-size:18px;cursor:pointer}
+.bottom button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.count{min-width:4.5em;text-align:center;font-variant-numeric:tabular-nums}
+.progress{position:fixed;top:0;left:0;height:4px;background:var(--accent);transition:width .45s ease}
+@media (max-width:600px){
+  .row{grid-template-columns:6.5em 1fr 3em;gap:8px}
+  .gtable div{grid-template-columns:1fr;gap:2px}
+  .slide{height:calc(100dvh - 88px)}
+}
+@media (prefers-reduced-motion:reduce){.slide,.bar,.progress,.pie{transition:none}}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<main class="deck" id="deck">
+
+<section class="slide title-slide">
+  <div class="kicker">설문 조사 결과 발표</div>
+  <h1>우리 반의 AI 사용 습관</h1>
+  <p class="lead">질문: 가장 많이 사용하는 AI가 무엇입니까?</p>
+  <p class="who">발표자: 대니 · 4과 문화</p>
+</section>
+
+<section class="slide">
+  <div class="kicker">1 · 설문 조사 대상과 주제 밝히기</div>
+  <h2>누구에게, 무엇을 물어봤을까요?</h2>
+  <div class="meta"><span class="chip">설문 대상: 23명</span><span class="chip">남자 4명</span><span class="chip">여자 19명</span><span class="chip">질문: 가장 많이 사용하는 AI는?</span></div>
+  <p class="say">제<mark>가</mark> 23명<mark>을 대상으로</mark> 가장 많이 사용하는 AI<mark>에 대해 설문 조사한 결과는 다음과 같습니다</mark>.</p>
+  <p class="pattern"><b>표현</b> -이/가 -을/를 대상으로 -에 대해 설문 조사한 결과는 다음과 같습니다</p>
+</section>
+
+<section class="slide">
+  <div class="kicker">설문 결과 ① 원그래프</div>
+  <h2>가장 많이 사용하는 AI는?</h2>
+  <div class="pie-wrap">
+    <div class="pie" role="img" aria-label="챗지피티 87.0%, 제미나이 8.7%, 클로드 4.3%"></div>
+    <ul class="legend">
+      <li><i style="background:var(--b1)"></i><span>챗지피티</span><b>20명 · 87.0%</b></li>
+      <li><i style="background:var(--b3)"></i><span>제미나이</span><b>2명 · 8.7%</b></li>
+      <li><i style="background:var(--b2)"></i><span>클로드</span><b>1명 · 4.3%</b></li>
+      <li class="dim"><i></i><span>딥시크</span><b>0명 · 0%</b></li>
+      <li class="dim"><i></i><span>AI 사용 안 함</span><b>0명 · 0%</b></li>
+    </ul>
+  </div>
+  <p class="pattern">설문 대상 23명 (남자 4명, 여자 19명) · 한 사람이 한 가지만 골랐습니다.</p>
+</section>
+
+<section class="slide">
+  <div class="kicker">설문 결과 ② 막대그래프</div>
+  <h2>가장 많이 사용하는 AI는?</h2>
+  <div class="chart">
+    <div class="row"><span>챗지피티</span><div class="track"><div class="bar" style="--w:87%;background:var(--b1)"></div></div><span class="pct">87.0%</span></div>
+    <div class="row"><span>제미나이</span><div class="track"><div class="bar" style="--w:8.7%;background:var(--b3)"></div></div><span class="pct">8.7%</span></div>
+    <div class="row"><span>클로드</span><div class="track"><div class="bar" style="--w:4.3%;background:var(--b2)"></div></div><span class="pct">4.3%</span></div>
+    <div class="row dim"><span>딥시크</span><div class="track"><div class="bar" style="--w:0%"></div></div><span class="pct">0%</span></div>
+    <div class="row dim"><span>사용 안 함</span><div class="track"><div class="bar" style="--w:0%"></div></div><span class="pct">0%</span></div>
+  </div>
+  <p class="pattern">23명 중 20명, 2명, 1명, 0명, 0명</p>
+</section>
+
+<section class="slide">
+  <div class="kicker">2 · 가장 많이 나온 의견 말하기</div>
+  <h2>1위는 챗지피티</h2>
+  <p class="say">챗지피티<mark>가</mark> 87%<mark>로 가장 많았습니다</mark>.</p>
+  <p class="say">챗지피티를 사용하는 사람<mark>이 가장 많은 것으로 나타났습니다</mark>.</p>
+  <p class="say">챗지피티를 사용하는 사람<mark>이 대부분이었습니다</mark>.</p>
+  <p class="pattern"><b>표현</b> -이/가 -%로 가장 많았습니다 · -이/가 가장 많은 것으로 나타났습니다 · -이/가 대부분이었습니다</p>
+</section>
+
+<section class="slide">
+  <div class="kicker">3 · 두 번째로 많이 나온 의견부터 순서대로 말하기</div>
+  <h2>그 다음은?</h2>
+  <p class="say"><mark>그 다음으로는</mark> 제미나이<mark>가</mark> 8.7%, 클로드<mark>가</mark> 4.3%<mark>의 순이었습니다</mark>.</p>
+  <p class="lead">같은 뜻: …의 순으로 나타났습니다 / …의 순서였습니다</p>
+  <p class="pattern"><b>표현</b> 그 다음으로는 -이/가 -%, -이/가 -%, -이/가 -%의 순이었습니다</p>
+</section>
+
+<section class="slide">
+  <div class="kicker">4 · 기타 의견 말하기</div>
+  <h2>0명인 대답도 눈에 띕니다</h2>
+  <p class="say">딥시크를 사용한<mark>다는 응답</mark>은 한 명도 없었습니다.</p>
+  <p class="say">AI를 사용하지 않는<mark>다는 응답</mark>도 한 명도 없었습니다.</p>
+  <p class="pattern"><b>표현</b> 그 밖에 -다는 의견/응답도 있었습니다 · 그 밖에 -다는 의견/응답도 적지 않았습니다</p>
+</section>
+
+<section class="slide">
+  <div class="kicker">5 · 설문 결과 분석하기</div>
+  <h2>무엇을 알 수 있었을까요?</h2>
+  <p class="say"><mark>이러한 결과를 통해</mark> 대부분의 사람이 챗지피티를 사용한<mark>다는 것을 알 수 있었습니다</mark>.</p>
+  <p class="say"><mark>이러한 결과를 통해</mark> 설문에 참여한 모든 사람이 AI를 사용<mark>함을 알 수 있었습니다</mark>.</p>
+  <p class="pattern"><b>표현</b> 이러한 결과를 통해 -다는 것을 알 수 있었습니다 · 이러한 결과를 통해 -(으)ㅁ을 알 수 있었습니다</p>
+</section>
+
+<section class="slide">
+  <div class="kicker">정리</div>
+  <h2>설문 결과를 설명할 때 사용하는 표현</h2>
+  <div class="gtable">
+    <div><span>대상과 주제 밝히기</span><span>-을/를 대상으로 -에 대해 설문 조사한 결과는 다음과 같습니다</span></div>
+    <div><span>가장 많이 나온 의견</span><span>-이/가 -%로 가장 많았습니다</span></div>
+    <div><span>두 번째부터 순서대로</span><span>그 다음으로는 … -의 순이었습니다</span></div>
+    <div><span>기타 의견</span><span>그 밖에 -다는 의견/응답도 있었습니다</span></div>
+    <div><span>결과 분석하기</span><span>이러한 결과를 통해 -다는 것을 알 수 있었습니다</span></div>
+  </div>
+  <p class="pattern">※ -(으)로 나타났습니다: 설문 결과에서 눈에 띄는 점을 말할 때 자주 써요.</p>
+</section>
+
+<section class="slide title-slide">
+  <div class="kicker">들어 주셔서</div>
+  <h1>감사합니다</h1>
+  <p class="lead">이 발표 자료는 Claude Code가 설문지 사진과 교과서 문법 표를 보고 만들었습니다.</p>
+</section>
+
+</main>
+<nav class="bottom" aria-label="슬라이드 이동">
+  <button id="prev" aria-label="이전 슬라이드">←</button>
+  <span class="count" id="count">1 / 9</span>
+  <button id="next" aria-label="다음 슬라이드">→</button>
+  <button id="full" aria-label="전체 화면">⛶</button>
+</nav>
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide')), i=0;
+  try{ var h=parseInt(location.hash.slice(1),10); if(h>0&&h<=slides.length) i=h-1; }catch(e){}
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){ s.classList.toggle('on',k===i); s.classList.toggle('past',k<i); });
+    document.getElementById('count').textContent=(i+1)+' / '+slides.length;
+    document.getElementById('progress').style.width=((i+1)/slides.length*100)+'%';
+    history.replaceState(null,'','#'+(i+1));
+  }
+  document.getElementById('prev').onclick=function(){show(i-1)};
+  document.getElementById('next').onclick=function(){show(i+1)};
+  document.getElementById('full').onclick=function(){
+    if(document.fullscreenElement) document.exitFullscreen(); else if(document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+  };
+  document.addEventListener('keydown',function(e){
+    if(['ArrowRight','PageDown',' ','Enter'].indexOf(e.key)>=0){e.preventDefault();show(i+1)}
+    else if(['ArrowLeft','PageUp','Backspace'].indexOf(e.key)>=0){e.preventDefault();show(i-1)}
+    else if(e.key==='Home') show(0); else if(e.key==='End') show(slides.length-1);
+    else if(e.key==='f'||e.key==='F') document.getElementById('full').click();
+  });
+  var x0=null;
+  document.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});
+  document.addEventListener('touchend',function(e){ if(x0===null) return; var dx=e.changedTouches[0].clientX-x0;
+    if(Math.abs(dx)>50) show(i+(dx<0?1:-1)); x0=null; });
+  show(i);
+})();
+</script>
+</body>
+</html>
