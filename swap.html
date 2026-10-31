@@ -459,10 +459,8 @@ function gShow(el){
   gpop.style.top = (r.bottom + 8 + gpop.offsetHeight > innerHeight ? r.top - gpop.offsetHeight - 8 : r.bottom + 8) + "px";
 }
 function gHide(){ gpop.hidden = true; if (gOn) { gOn.classList.remove("on"); gOn = null; } }
-const hoverable = matchMedia("(hover: hover)").matches;
-document.addEventListener("mouseover", e => { if (!hoverable) return; const el = e.target.closest(".gw"); if (el) gShow(el); });
-document.addEventListener("mouseout", e => { if (hoverable && e.target.closest(".gw")) gHide(); });
-document.addEventListener("click", e => { const el = e.target.closest(".gw"); if (el) { if (gOn === el && !hoverable) gHide(); else gShow(el); e.stopPropagation(); } else gHide(); }, true);
+// click only: a click opens the bubble, a second click on the same word or anywhere else closes it
+document.addEventListener("click", e => { const el = e.target.closest(".gw"); if (el) { if (gOn === el) gHide(); else gShow(el); e.stopPropagation(); } else gHide(); }, true);
 addEventListener("scroll", gHide, { passive: true });
 function showQ(){
   clearTimeout(R.timer); gHide();
