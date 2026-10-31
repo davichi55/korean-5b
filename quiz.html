@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Korean 5B — 1–4과 퀴즈 준비</title>
+<meta name="description" content="Sogang Korean 5B: a 2-day plan for the chapter 1–4 quiz — words, grammar, reading, and a mock quiz.">
+<link rel="manifest" href="vocab.webmanifest">
+<link rel="icon" href="icon-exam-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  /* same navy palette as the other 5B pages */
+  :root{
+    --bg:#0f1420; --bg2:#161d2e; --card:#1c2740; --line:#2c3a5a; --txt:#eaf0fb; --dim:#96a3c2; --accent:#5b8cff;
+    --gold:#ffc766; --good:#4fd18b; color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+  .wrap{max-width:720px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px}
+  a{color:inherit}
+  .back{color:var(--dim);text-decoration:none;font-size:14px}
+  header h1{margin:6px 0 4px;font-size:26px;font-weight:900;text-wrap:balance}
+  header p{margin:0;color:var(--dim);font-size:14px;line-height:1.55}
+  .dday{display:inline-flex;align-items:center;gap:8px;margin-top:10px;background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:14px}
+  .dday b{color:var(--gold);font-size:18px}
+  .bar{height:8px;border-radius:8px;background:var(--bg2);overflow:hidden;border:1px solid var(--line)}
+  .bar i{display:block;height:100%;width:0;background:var(--good);transition:width .4s}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .step h2{margin:0;font-size:19px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .step h2 .n{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;font-size:15px;flex:none}
+  .step h2 small{color:var(--dim);font-weight:400;font-size:13px}
+  .why{margin:0;color:var(--dim);font-size:14px;line-height:1.55}
+  .tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .task{display:flex;gap:10px;align-items:flex-start;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .task .tick{flex:none;width:24px;height:24px;border-radius:7px;border:1.5px solid var(--line);background:transparent;color:transparent;font-weight:900;cursor:pointer;display:grid;place-items:center;margin-top:1px}
+  .task.done .tick{background:var(--good);border-color:var(--good);color:#0b1a12}
+  .task.done .tt{opacity:.6}
+  .tt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .tt b{font-size:15px}
+  .tt span{color:var(--dim);font-size:13px;line-height:1.45}
+  .go{flex:none;align-self:center;background:var(--accent);color:#fff;border:0;border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;text-decoration:none}
+  .go:hover{filter:brightness(1.1)}
+  .gram{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px}
+  .gram .ch{color:var(--gold);font-weight:700;padding-top:1px}
+  .gram ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+  .gram li b{font-weight:700}
+  .gram li span{color:var(--dim)}
+  .gram li .star{color:var(--gold)}
+  .reads{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .read{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px}
+  .read b{display:block}
+  .read span{color:var(--dim);font-size:12px}
+  .note{background:rgba(255,199,102,.08);border:1px dashed var(--gold);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--txt);line-height:1.5}
+  .plan{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:14px;line-height:1.5}
+  .plan b{color:var(--gold)}
+  footer{color:#55617f;font-size:12px;text-align:center}
+  @media(max-width:520px){ .reads{grid-template-columns:1fr} .task{flex-wrap:wrap} .go{margin-left:34px} }
+  button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← 5B 단어장</a>
+  <header>
+    <h1>📅 1–4과 퀴즈 준비</h1>
+    <p>A plan for the chapter 1–4 quiz: first the words, then the grammar, then reading, and a mock quiz at the end. Each button opens the right exercise with only chapters 1–4 selected. Tick a task when it's done.</p>
+    <div class="dday" id="dday"></div>
+  </header>
+  <div class="bar" aria-label="progress"><i id="prog"></i></div>
+
+  <section class="step">
+    <h2><span class="n">1</span>단어 · Words <small>373 words · 1–4과</small></h2>
+    <p class="why">Words first: the grammar and reading questions all use them. Start with the ★ words, those are the ones the class sheet marks for the exam.</p>
+    <ul class="tasks">
+      <li class="task" data-t="w1"><button class="tick" aria-label="done">✓</button><div class="tt"><b>Flashcards 1–4과</b><span>Go through every chapter once. Tap a card for the meaning; mark the ones you know.</span></div><a class="go" data-go="vocab">Open →</a></li>
+      <li class="task" data-t="w2"><button class="tick" aria-label="done">✓</button><div class="tt"><b>바꿔 쓰기 · ★ words</b><span>Pick the word that can replace the underlined part, like the real exam. Priority words only.</span></div><a class="go" data-go="swapStar">Play →</a></li>
+      <li class="task" data-t="w3"><button class="tick" aria-label="done">✓</button><div class="tt"><b>바꿔 쓰기 · all words</b><span>Rounds of 20 until most words are green. Missed words come back in the same round.</span></div><a class="go" data-go="swapAll">Play →</a></li>
+      <li class="task" data-t="w4"><button class="tick" aria-label="done">✓</button><div class="tt"><b>의성어·의태어 (2과)</b><span>꼬르륵, 꾸벅꾸벅, 벌컥벌컥… fill in the blank.</span></div><a class="go" data-go="ono">Play →</a></li>
+    </ul>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">2</span>문법 · Grammar <small>15 points · ★ = on the 5B 문법 handout</small></h2>
+    <p class="why">Read each explanation once, then build sentences with it. The ★ points are the ones the teacher practised most.</p>
+    <div class="gram">
+      <div class="ch">1과</div><ul>
+        <li><b>-(으)ㄹ 뻔하다</b> <span class="star">★</span> <span>almost happened</span></li>
+        <li><b>-아/어서 그런지</b> <span class="star">★</span> <span>maybe because ~</span></li>
+        <li><b>(-(으)면) -(으)ㄹ수록</b> <span class="star">★</span> <span>the more ~, the more ~</span></li>
+        <li><b>-기보다(는)</b> <span>rather than ~</span> · <b>-(으)ㄴ/는 이상</b> <span>since / as long as ~</span></li></ul>
+      <div class="ch">2과</div><ul>
+        <li><b>-(으)ㄹ 리가 없다</b> <span class="star">★</span> <span>there's no way that ~</span></li>
+        <li><b>-는 바람에</b> <span class="star">★</span> <span>because something suddenly happened (bad result)</span></li>
+        <li><b>-(으)ㄴ/는 척하다</b> <span class="star">★</span> <span>to pretend to ~</span></li>
+        <li><b>-는 둥 마는 둥</b> <span>half-heartedly</span> · <b>-답니다</b> <span>storyteller ending</span></li></ul>
+      <div class="ch">3과</div><ul>
+        <li><b>-(으)ㄹ걸(요)</b> <span class="star">★</span> <span>I think ~ / probably ~ (soft guess)</span></li>
+        <li><b>-다고 (해서) -는 것은 아니다</b> <span class="star">★</span> <span>just because ~ doesn't mean ~</span></li>
+        <li><b>-아/어 두다</b> <span class="star">★</span> <span>do in advance and keep</span></li>
+        <li><b>-(느)냐에 따라</b> <span>depending on ~</span> · <b>-아/어 내다</b> <span>manage to ~ in the end</span></li></ul>
+      <div class="ch">4과</div><ul>
+        <li><b>-(으)ㄹ 정도로</b> <span class="star">★</span> <span>so ~ that ~</span></li>
+        <li><b>-기만 하다</b> <span class="star">★</span> <span>only does ~</span></li>
+        <li><b>뭔가 / 누군가 / 어딘가 / 언젠가</b> <span class="star">★</span> <span>something / someone / somewhere / some day</span></li>
+        <li><b>-(으)ㅁ으로써</b> <span>by doing ~ (written)</span></li></ul>
+    </div>
+    <ul class="tasks">
+      <li class="task" data-t="g1"><button class="tick" aria-label="done">✓</button><div class="tt"><b>Read the explanations</b><span>Meaning, how it attaches, examples, and a quiz per chapter.</span></div><a class="go" data-go="grammar">Open →</a></li>
+      <li class="task" data-t="g2"><button class="tick" aria-label="done">✓</button><div class="tt"><b>Build sentences 1–4과</b><span>Tap the blocks in the right order; some blocks are traps with the wrong form.</span></div><a class="go" data-go="tiles">Play →</a></li>
+      <li class="task" data-t="g3"><button class="tick" aria-label="done">✓</button><div class="tt"><b>말하기 I expressions</b><span>1과 인용하기 (-에 의하면 -다고 하다…), 4과 설문 결과 설명하기 (-이/가 -%로 가장 많았습니다…). They're in the word list under 말하기 I.</span></div><a class="go" data-go="speak">Open →</a></li>
+    </ul>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">3</span>읽기 · Reading <small>8 texts</small></h2>
+    <p class="why">The reading questions ask about the main idea, the writer's opinion, the order of events and details. These are the texts of chapters 1–4:</p>
+    <div class="reads">
+      <div class="read"><b>1과 · 가요계의 '립싱크' 논란</b><span>인터넷 기사 · the writer's opinion</span></div>
+      <div class="read"><b>1과 · 영화 '말아톤' 관객 평</b><span>film reviews · plot, sorting good/bad points</span></div>
+      <div class="read"><b>2과 · 청개구리 이야기, 흥부와 놀부</b><span>folk tales · retelling the story</span></div>
+      <div class="read"><b>2과 · 해님 달님</b><span>folk tale · order of events, details</span></div>
+      <div class="read"><b>3과 · 생활의 지혜</b><span>life hacks · finding and passing on information</span></div>
+      <div class="read"><b>3과 · 지혜로운 사람은 뇌를 변화시킨다</b><span>magazine article · guessing word meanings</span></div>
+      <div class="read"><b>4과 · 한국인은 현재……</b><span>survey report · finding the numbers</span></div>
+      <div class="read"><b>4과 · 한국인의 정</b><span>report · the key point</span></div>
+    </div>
+    <div class="note">Reading practice for these texts is coming: send photos of the 읽기 pages (and any example questions), and they'll be added here as practice questions.</div>
+  </section>
+
+  <section class="step">
+    <h2><span class="n">4</span>모의 퀴즈 · Mock quiz</h2>
+    <p class="why">At the end, take a full mock test with only chapters 1–4: word meanings, collocations, wrong usage, grammar and dialogues. Practice mode gives feedback after every question.</p>
+    <ul class="tasks">
+      <li class="task" data-t="m1"><button class="tick" aria-label="done">✓</button><div class="tt"><b>Mock quiz 1–4과</b><span>Do it once, then redo only what went wrong.</span></div><a class="go" data-go="exam">Start →</a></li>
+    </ul>
+  </section>
+
+  <section class="step">
+    <h2>A plan for 2 days</h2>
+    <div class="plan">
+      <b>Day 1</b><span>Step 1 (words): flashcards for all 4 chapters, then 바꿔 쓰기 ★ words. About 1.5 hours.</span>
+      <b>Day 2</b><span>바꿔 쓰기 all words (20 min), step 2 (grammar, 1 hour), reading texts once more, then the mock quiz.</span>
+      <b>Monday</b><span>15 minutes before the quiz: the ★ words you still got wrong, and the 15 grammar points above.</span>
+    </div>
+  </section>
+  <footer>Sogang Korean 5B · made with AI help, so ask a teacher if something looks off.</footer>
+</div>
+
+<script>
+// Each button stores the same choices the other 5B pages remember, so they open on chapters 1–4.
+const set = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const SEC = ["r1", "s1", "r2", "v"];
+const CH = [1, 2, 3, 4];
+const GO = {
+  vocab:   () => { set("k5b_sel", JSON.stringify(CH.flatMap(c => SEC.map(s => `ch${c}-${s}`)))); return "index.html"; },
+  speak:   () => { set("k5b_sel", JSON.stringify(CH.map(c => `ch${c}-s1`))); return "index.html"; },
+  swapStar:() => { set("k5b_swap_mode", '"w"'); set("k5b_swap_ch", JSON.stringify(CH.map(c => "ch" + c))); set("k5b_swap_star", "true"); return "swap.html"; },
+  swapAll: () => { set("k5b_swap_mode", '"w"'); set("k5b_swap_ch", JSON.stringify(CH.map(c => "ch" + c))); set("k5b_swap_star", "false"); set("k5b_swap_len", "20"); return "swap.html"; },
+  ono:     () => { set("k5b_swap_mode", '"o"'); set("k5b_swap_och", '["2"]'); return "swap.html"; },
+  grammar: () => { set("k5b_gr_ch", "1"); return "grammar.html"; },
+  tiles:   () => { set("k5b_swap_mode", '"g"'); set("k5b_swap_gch", JSON.stringify(CH.map(String))); return "swap.html"; },
+  exam:    () => { set("k5b_exam_ch", JSON.stringify(CH)); set("k5b_exam_mode", '"practice"'); return "exam.html"; },
+};
+document.querySelectorAll("[data-go]").forEach(a => {
+  a.href = "#";
+  a.addEventListener("click", e => { e.preventDefault(); location.href = GO[a.dataset.go](); });
+});
+
+// ticks
+let done = {};
+try { done = JSON.parse(localStorage.getItem("k5b_quiz14_done") || "{}"); } catch (e) {}
+function paint(){
+  const tasks = [...document.querySelectorAll(".task")];
+  tasks.forEach(t => t.classList.toggle("done", !!done[t.dataset.t]));
+  document.getElementById("prog").style.width = (100 * tasks.filter(t => done[t.dataset.t]).length / tasks.length) + "%";
+}
+document.querySelectorAll(".tick").forEach(b => b.addEventListener("click", () => {
+  const id = b.closest(".task").dataset.t; done[id] = !done[id];
+  try { localStorage.setItem("k5b_quiz14_done", JSON.stringify(done)); } catch (e) {}
+  paint();
+}));
+paint();
+
+// countdown to the quiz (Monday 2026-11-02)
+const quiz = new Date(2026, 10, 2), today = new Date(); today.setHours(0, 0, 0, 0);
+const d = Math.round((quiz - today) / 864e5);
+document.getElementById("dday").innerHTML = d > 0 ? `퀴즈까지 <b>D-${d}</b> · 월요일 11월 2일` : d === 0 ? `<b>D-day</b> · 오늘 퀴즈! 화이팅` : `퀴즈 끝! 수고했어요 🎉`;
+</script>
+</body>
+</html>
