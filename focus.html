@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>집중 사다리 · Focus Ladder</title>
+<meta name="description" content="Focus ladder: start with blocks as long as you can really focus, tap when your mind drifts, and the block grows one minute each time you stay with it.">
+<meta name="theme-color" content="#0f1420">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0f1420; --card:#1c2740; --card2:#223052; --line:#2c3a5a; --txt:#eaf0fb; --dim:#96a3c2;
+    --accent:#5b8cff; --gold:#ffcf5c; --good:#37d18f; --warn:#ffb15c; --bad:#ff6b7a;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{margin:0;height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",Roboto,sans-serif;
+    background:var(--bg);color:var(--txt);-webkit-tap-highlight-color:transparent}
+  .wrap{max-width:560px;margin:0 auto;padding:16px;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;min-height:100%}
+  header{display:flex;align-items:center;gap:10px}
+  header a{color:var(--dim);text-decoration:none;font-size:14px}
+  header h1{font-size:18px;margin:0;flex:1}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .lvl{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .lvl .big{font-size:44px;font-weight:800;font-variant-numeric:tabular-nums}
+  .lvl .sub{color:var(--dim);font-size:14px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+  .stat{background:var(--card2);border-radius:10px;padding:8px;text-align:center}
+  .stat b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+  .stat span{font-size:11px;color:var(--dim)}
+  .label{font-size:12px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;margin:0 0 8px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--txt);font-size:14px;cursor:pointer}
+  .chip.on{border-color:var(--accent);background:#2b3f70}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  button.go{width:100%;padding:16px;border:0;border-radius:14px;background:var(--accent);color:#fff;font-size:18px;font-weight:800;cursor:pointer}
+  button.ghost{padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:14px;cursor:pointer}
+  .toggle{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--dim);cursor:pointer}
+  .rule{font-size:13px;color:var(--dim);line-height:1.6;margin:0}
+  .rule b{color:var(--txt)}
+  /* run screen */
+  #run{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;
+    padding-top:calc(24px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+  #run .task{color:var(--dim);font-size:16px}
+  #run .clock{font-size:min(26vw,140px);font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+  #run .bar{width:min(420px,90%);height:6px;background:var(--card);border-radius:3px;overflow:hidden}
+  #run .bar i{display:block;height:100%;background:var(--accent);width:0}
+  #drift{padding:18px 28px;border-radius:18px;border:2px solid var(--warn);background:transparent;color:var(--warn);font-size:18px;font-weight:800;cursor:pointer}
+  #drift:active{background:#3a2a14}
+  #run .marks{font-size:22px;letter-spacing:4px;min-height:28px;color:var(--warn)}
+  #run .hint{font-size:12px;color:var(--dim)}
+  #quit{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px}
+  /* end + break */
+  .verdict{font-size:22px;font-weight:800;margin:0 0 6px}
+  .verdict.up{color:var(--good)} .verdict.same{color:var(--gold)} .verdict.down{color:var(--bad)}
+  .chart{display:flex;align-items:flex-end;gap:4px;height:90px;margin-top:6px}
+  .chart i{flex:1;min-width:6px;max-width:22px;border-radius:3px 3px 0 0;background:var(--accent)}
+  .chart i.up{background:var(--good)} .chart i.same{background:var(--gold)} .chart i.down{background:var(--bad)}
+  .legend{display:flex;gap:12px;font-size:11px;color:var(--dim);margin-top:6px;flex-wrap:wrap}
+  .legend em{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;font-style:normal}
+  .hist{font-size:13px;color:var(--dim);line-height:1.8;margin:0;padding:0;list-style:none}
+  .hist b{color:var(--txt);font-variant-numeric:tabular-nums}
+  @media (max-width:420px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap" id="home">
+  <header><a href="index.html">← 5B</a><h1>🎯 집중 사다리 · Focus Ladder</h1></header>
+
+  <div class="card">
+    <div class="lvl"><span class="big" id="len">5:00</span><span class="sub">다음 블록 · next block</span></div>
+    <div class="stats">
+      <div class="stat"><b id="sBest">–</b><span>최고 클린 블록</span></div>
+      <div class="stat"><b id="sToday">0</b><span>오늘 집중 (분)</span></div>
+      <div class="stat"><b id="sStreak">0</b><span>연속 일수</span></div>
+      <div class="stat"><b id="sDrift">–</b><span>딴생각 / 10분</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="label">지금 할 것 · task</p>
+    <div class="chips" id="tasks"></div>
+  </div>
+
+  <button class="go" id="start">시작 · Start</button>
+
+  <div class="card">
+    <p class="rule"><b>딴생각 버튼</b>: every time you notice your mind left the task, tap it (or press Space) and go straight back. Noticing is the skill; it is not a fail.<br>
+    <b>0–1 taps</b> → next block +1 min · <b>2–3</b> → same length · <b>4+ or quit</b> → −1 min (never under 3).</p>
+    <div class="row" style="margin-top:10px">
+      <label class="toggle"><input type="checkbox" id="leaveCount"> 이 화면을 떠나면 딴생각으로 세기 (phone mode)</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="label">최근 블록 · last blocks</p>
+    <div class="chart" id="chart"></div>
+    <div class="legend"><span><em style="background:var(--good)"></em>올라감</span><span><em style="background:var(--gold)"></em>유지</span><span><em style="background:var(--bad)"></em>내려감</span><span>height = minutes</span></div>
+    <ul class="hist" id="hist" style="margin-top:10px"></ul>
+  </div>
+
+  <div class="row"><button class="ghost" id="setLen">길이 직접 정하기 · set length</button><button class="ghost" id="reset">기록 지우기 · reset</button></div>
+</div>
+
+<div id="run" hidden>
+  <button class="ghost" id="quit">그만 · quit</button>
+  <div class="task" id="rTask"></div>
+  <div class="clock" id="rClock">5:00</div>
+  <div class="bar"><i id="rBar"></i></div>
+  <button id="drift">딴생각 · drifted</button>
+  <div class="marks" id="rMarks"></div>
+  <div class="hint">Space = 딴생각</div>
+</div>
+
+<div class="wrap" id="end" hidden>
+  <div class="card">
+    <p class="verdict" id="eVerdict"></p>
+    <p class="rule" id="eLine"></p>
+  </div>
+  <div class="card">
+    <p class="label">쉬는 시간 · break</p>
+    <div class="lvl"><span class="big" id="bClock">1:00</span><span class="sub">일어나서 물 마시기 · no phone</span></div>
+  </div>
+  <button class="go" id="next">다음 블록 · Next block</button>
+  <button class="ghost" id="home2">처음으로 · Home</button>
+</div>
+
+<script>
+const KEY = "k5b_focus";
+const TASKS = ["📖 읽기 스피드런", "✍️ 대화 쓰기", "📘 문법", "🎤 인터뷰", "📝 쓰기", "기타"];
+const $ = id => document.getElementById(id);
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { S = null; }
+if (!S) S = { len: 5, task: 0, leave: matchMedia("(pointer:coarse)").matches, log: [] };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const mmss = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+const day = t => new Date(t).toLocaleDateString("en-CA");
+
+function home() {
+  $("home").hidden = false; $("run").hidden = true; $("end").hidden = true;
+  $("len").textContent = mmss(S.len * 60);
+  $("tasks").innerHTML = TASKS.map((t, i) => `<button class="chip${i === S.task ? " on" : ""}" data-i="${i}">${t}</button>`).join("");
+  $("leaveCount").checked = !!S.leave;
+  const clean = S.log.filter(b => b.full && b.drifts <= 1);
+  $("sBest").textContent = clean.length ? Math.max(...clean.map(b => b.min)) + "분" : "–";
+  const today = day(Date.now());
+  $("sToday").textContent = Math.round(S.log.filter(b => day(b.t) === today).reduce((a, b) => a + b.sec, 0) / 60);
+  let streak = 0, d = new Date();
+  const days = new Set(S.log.map(b => day(b.t)));
+  if (!days.has(day(d))) d.setDate(d.getDate() - 1);
+  while (days.has(day(d))) { streak++; d.setDate(d.getDate() - 1); }
+  $("sStreak").textContent = streak;
+  const last = S.log.slice(-10), secs = last.reduce((a, b) => a + b.sec, 0);
+  $("sDrift").textContent = secs > 60 ? (last.reduce((a, b) => a + b.drifts, 0) / secs * 600).toFixed(1) : "–";
+  const show = S.log.slice(-24), mx = Math.max(10, ...show.map(b => b.min));
+  $("chart").innerHTML = show.length ? show.map(b => `<i class="${b.res}" style="height:${Math.max(6, b.sec / 60 / mx * 100)}%" title="${b.min}분 · 딴생각 ${b.drifts}"></i>`).join("") : `<span class="rule">아직 없어요 · nothing yet</span>`;
+  $("hist").innerHTML = S.log.slice(-5).reverse().map(b => `<li>${new Date(b.t).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} · ${TASKS[b.task] || ""} · <b>${mmss(b.sec)}</b> / ${b.min}분 · 딴생각 <b>${b.drifts}</b>${b.full ? "" : " · 그만둠"}</li>`).join("");
+}
+
+$("tasks").onclick = e => { const b = e.target.closest(".chip"); if (!b) return; S.task = +b.dataset.i; save(); home(); };
+$("leaveCount").onchange = e => { S.leave = e.target.checked; save(); };
+$("setLen").onclick = () => {
+  const box = $("setLen");
+  if (box.dataset.open) return;
+  box.dataset.open = 1;
+  box.outerHTML = `<span class="row" id="lenRow"><input id="lenIn" type="number" min="1" max="90" value="${S.len}" style="width:70px;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--txt);font-size:15px"> 분 <button class="ghost" id="lenOk">OK</button></span>`;
+  $("lenOk").onclick = () => { const v = Math.round(+$("lenIn").value); if (v >= 1 && v <= 90) { S.len = v; save(); } location.reload(); };
+};
+$("reset").onclick = () => {
+  const b = $("reset");
+  if (b.dataset.sure) { S = { len: 5, task: S.task, leave: S.leave, log: [] }; save(); location.reload(); return; }
+  b.dataset.sure = 1; b.textContent = "정말? 한 번 더 누르면 지워져요"; b.style.color = "var(--bad)";
+};
+
+// ---- the block ----
+let run = null, lock = null, ac = null;
+function beep(f, d, when = 0) {
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + when;
+    o.type = "sine"; o.frequency.value = f; o.connect(g); g.connect(ac.destination);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.start(t); o.stop(t + d + 0.05);
+  } catch (e) {}
+}
+function start() {
+  beep(660, 0.25);
+  run = { t: Date.now(), end: Date.now() + S.len * 60000, min: S.len, task: S.task, drifts: 0 };
+  $("home").hidden = true; $("end").hidden = true; $("run").hidden = false;
+  $("rTask").textContent = TASKS[S.task]; $("rMarks").textContent = "";
+  try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => lock = l).catch(() => {}); } catch (e) {}
+  tick();
+}
+function tick() {
+  if (!run) return;
+  const left = Math.max(0, (run.end - Date.now()) / 1000);
+  $("rClock").textContent = mmss(Math.ceil(left));
+  $("rBar").style.width = (100 - left / (run.min * 60) * 100) + "%";
+  if (left <= 0) return finish(true);
+  setTimeout(tick, 250);
+}
+function drift() {
+  if (!run) return;
+  run.drifts++; beep(330, 0.12);
+  $("rMarks").textContent = "•".repeat(run.drifts);
+}
+function finish(full) {
+  if (!run) return;
+  const sec = Math.round(Math.min(run.min * 60, (Date.now() - run.t) / 1000));
+  const b = { t: run.t, min: run.min, sec, task: run.task, drifts: run.drifts, full };
+  const old = S.len;
+  if (!full || b.drifts >= 4) { b.res = "down"; S.len = Math.max(3, S.len - 1); }
+  else if (b.drifts <= 1) { b.res = "up"; S.len = Math.min(90, S.len + 1); }
+  else b.res = "same";
+  S.log.push(b); save();
+  run = null;
+  try { lock && lock.release(); } catch (e) {} lock = null;
+  if (full) { beep(784, 0.3); beep(988, 0.4, 0.3); }
+  showEnd(b, old);
+}
+function showEnd(b, old) {
+  $("run").hidden = true; $("home").hidden = true; $("end").hidden = false;
+  const v = $("eVerdict");
+  v.className = "verdict " + b.res;
+  v.textContent = b.res === "up" ? `올라감! 다음 블록 ${S.len}분` : b.res === "same" ? `유지 · 다음도 ${S.len}분` : `다음 블록 ${S.len}분`;
+  const prevClean = S.log.slice(0, -1).filter(x => x.full && x.drifts <= 1).map(x => x.min);
+  const pb = b.res === "up" && (!prevClean.length || b.min > Math.max(...prevClean));
+  $("eLine").innerHTML = `${mmss(b.sec)} 집중 · 딴생각 ${b.drifts}번${b.full ? "" : " · 중간에 그만둠"}${pb ? " · <b style='color:var(--gold)'>새 최고 기록!</b>" : ""}`;
+  // break = a fifth of the block, at least 1 minute
+  let br = Math.max(60, Math.round(b.min * 60 / 5)), bEnd = Date.now() + br * 1000;
+  const bt = () => { if ($("end").hidden) return; const l = Math.max(0, (bEnd - Date.now()) / 1000); $("bClock").textContent = mmss(Math.ceil(l)); if (l <= 0) { beep(660, 0.25); return; } setTimeout(bt, 500); };
+  bt();
+}
+
+$("start").onclick = start;
+$("next").onclick = start;
+$("home2").onclick = home;
+$("drift").onclick = drift;
+$("quit").onclick = () => finish(false);
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && run) { e.preventDefault(); drift(); }
+  else if (e.code === "Enter" && !run && !$("home").hidden) start();
+});
+document.addEventListener("visibilitychange", () => {
+  if (run && document.hidden && S.leave) drift();
+  if (run && !document.hidden) { try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => lock = l).catch(() => {}); } catch (e) {} }
+});
+home();
+</script>
+</body>
+</html>
