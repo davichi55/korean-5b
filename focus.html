@@ -61,6 +61,13 @@
   .legend em{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;font-style:normal}
   .hist{font-size:13px;color:var(--dim);line-height:1.8;margin:0;padding:0;list-style:none}
   .hist b{color:var(--txt);font-variant-numeric:tabular-nums}
+  #rWake{font-size:22px;font-weight:800;color:var(--bad);text-align:center}
+  @keyframes fl{from{background:var(--bg)}to{background:#5a1420}}
+  #run.flash{animation:fl .3s 6 alternate}
+  #probe{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(15,20,32,.94);
+    font-size:22px;font-weight:800;color:var(--gold);text-align:center;padding:12px}
+  #probe button{padding:12px 28px;border-radius:14px;border:2px solid var(--good);background:transparent;color:var(--good);font-size:18px;font-weight:800;cursor:pointer}
+  #probe small{font-size:12px;color:var(--dim);font-weight:400}
   /* desktop app: while a block runs the window shrinks to a small always-on-top timer */
   body.mini #run{gap:6px;padding:8px}
   body.mini #run .clock{font-size:52px}
@@ -70,6 +77,10 @@
   body.mini #run .marks{font-size:14px;min-height:16px;letter-spacing:2px}
   body.mini #quit{top:auto;bottom:4px;right:4px;padding:3px 8px;font-size:11px}
   body.mini #run .bar{height:4px}
+  body.mini #rWake{font-size:14px}
+  body.mini #rWake:not([hidden]) ~ .hint, body.mini #rWake:not([hidden]) ~ .marks{display:none}
+  body.mini #probe{font-size:15px;gap:6px;padding:6px}
+  body.mini #probe button{padding:6px 18px;font-size:14px}
   @media (max-width:420px){.stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -95,11 +106,19 @@
   <button class="go" id="start">시작 · Start</button>
 
   <div class="card">
-    <p class="rule"><b>딴생각 버튼</b>: every time you notice your mind left the task, tap it (or press Space) and go straight back. Noticing is the skill; it is not a fail.<br>
+    <p class="rule"><b>딴생각 버튼</b>: every time you notice your mind left the task, tap it (or press Space) and go straight back. You get a wake-up call, louder each time in the same block.<br>
     <b>0–1 taps</b> → next block +1 min · <b>2–3</b> → same length · <b>4+ or quit</b> → −1 min (never under 3).</p>
     <div class="row" style="margin-top:10px">
       <label class="toggle"><input type="checkbox" id="leaveCount"> 이 화면을 떠나면 딴생각으로 세기 (phone mode)</label>
     </div>
+  </div>
+
+  <div class="card">
+    <p class="label">깨우기 · wake-up call</p>
+    <div class="chips" id="wakeLv"></div>
+    <p class="label" style="margin-top:14px">랜덤 체크 · random checks</p>
+    <div class="chips" id="probeLv"></div>
+    <p class="rule" style="margin-top:10px" id="probeRule"></p>
   </div>
 
   <div class="card">
@@ -118,8 +137,10 @@
   <div class="clock" id="rClock">5:00</div>
   <div class="bar"><i id="rBar"></i></div>
   <button id="drift">딴생각 · drifted</button>
+  <div id="rWake" hidden></div>
   <div class="marks" id="rMarks"></div>
-  <div class="hint" id="rHint">Space = 딴생각</div>
+  <div class="hint" id="rHint">Space = 딴생각 · Enter = 네</div>
+  <div id="probe" hidden>집중하고 있어요?<button id="here">네! · here</button><small id="probeKey">Enter</small></div>
 </div>
 
 <div class="wrap" id="end" hidden>
@@ -142,6 +163,9 @@ const $ = id => document.getElementById(id);
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { S = null; }
 if (!S) S = { len: 5, task: 0, leave: matchMedia("(pointer:coarse)").matches, log: [] };
+if (S.wake == null) S.wake = 2;
+if (S.probe == null) S.probe = 1;
+const WAKE = ["끔 · off", "보통 · calm voice", "세게 · alarm + shout"];
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 const mmss = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
 const day = t => new Date(t).toLocaleDateString("en-CA");
@@ -152,6 +176,9 @@ function home() {
   $("tasks").innerHTML = TASKS.map((t, i) => `<button class="chip${i === S.task ? " on" : ""}" data-i="${i}">${t}</button>`).join("");
   $("leaveCount").checked = !!S.leave;
   if (window.focusApp) { $("leaveCount").closest(".row").hidden = true; document.querySelector("header a").hidden = true; }
+  $("wakeLv").innerHTML = WAKE.map((t, i) => `<button class="chip${i === S.wake ? " on" : ""}" data-i="${i}">${t}</button>`).join("");
+  $("probeLv").innerHTML = ["끔 · off", "켜기 · on"].map((t, i) => `<button class="chip${i === S.probe ? " on" : ""}" data-i="${i}">${t}</button>`).join("");
+  $("probeRule").innerHTML = `Every 1½–4 min a voice asks <b>집중하고 있어요?</b> Answer with <b>${window.focusApp ? "F8" : "Enter"}</b> within 7 s. No answer = a drift and a louder wake-up. After every drift a check comes 30–60 s later, to see that you came back.${window.focusApp ? " <b>딴 화면</b>: if YouTube, Diablo, Discord… is in front for 10 s, or anything but the task page during 읽기 / 문법 / 인터뷰, that is a drift and a shout too. Only the window title is read, on this PC." : ""}`;
   const clean = S.log.filter(b => b.full && b.drifts <= 1);
   $("sBest").textContent = clean.length ? Math.max(...clean.map(b => b.min)) + "분" : "–";
   const today = day(Date.now());
@@ -169,6 +196,12 @@ function home() {
 }
 
 $("tasks").onclick = e => { const b = e.target.closest(".chip"); if (!b) return; S.task = +b.dataset.i; save(); home(); };
+$("wakeLv").onclick = e => {   // picking a level plays a sample of its loudest call
+  const b = e.target.closest(".chip"); if (!b) return;
+  S.wake = +b.dataset.i; save(); home();
+  if (S.wake) { const r = run; run = { task: S.task, drifts: S.wake === 2 ? 3 : 1 }; wake(false, true); run = r; }
+};
+$("probeLv").onclick = e => { const b = e.target.closest(".chip"); if (!b) return; S.probe = +b.dataset.i; save(); home(); };
 $("leaveCount").onchange = e => { S.leave = e.target.checked; save(); };
 $("setLen").onclick = () => {
   const box = $("setLen");
@@ -194,13 +227,70 @@ function beep(f, d, when = 0) {
     o.start(t); o.stop(t + d + 0.05);
   } catch (e) {}
 }
+function tone(type, f1, f2, d, gain, when = 0) {
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + when;
+    o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.linearRampToValueAtTime(f2, t + d);
+    o.connect(g); g.connect(ac.destination);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02); g.gain.setValueAtTime(gain, t + d - 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.start(t); o.stop(t + d + 0.05);
+  } catch (e) {}
+}
+function alarm(lv) {
+  if (lv === 1) { tone("triangle", 523, 523, 0.15, 0.5); tone("triangle", 659, 659, 0.2, 0.5, 0.2); }
+  else if (lv === 2) { tone("square", 440, 440, 0.25, 0.3); tone("square", 440, 440, 0.4, 0.3, 0.32); }
+  else for (let i = 0; i < 3; i++) tone("sawtooth", 500, 1150, 0.33, 0.45, i * 0.36);   // siren
+}
+// Yuna's voice: clips recorded once with tools/make-voice.js (desktop app only; the list comes from voice/clips.json)
+let CLIPS = null, voiceEl = null;
+const pick = a => a[Math.floor(Math.random() * a.length)];
+function play(file) {
+  if (!file) return;
+  try { if (voiceEl) voiceEl.pause(); voiceEl = new Audio("voice/" + file); voiceEl.volume = 1; voiceEl.play().catch(() => {}); } catch (e) {}
+}
+// the wake-up call: level 1 = chime + calm line, 2 = buzzer + firm line, 3 = siren + shout. "세게" climbs with the drifts in this block.
+// kind: true = a random check went unanswered (one level higher), "off" = the window in front is not the task (always level 3)
+function wake(kind, demo, app) {
+  if (!S.wake) { beep(330, 0.12); return; }
+  const lv = kind === "off" ? 3 : S.wake === 1 ? 1 : Math.min(3, run.drifts + (kind ? 1 : 0));
+  alarm(lv);
+  if (CLIPS) setTimeout(() => play(kind === "off" ? pick(CLIPS.off) : pick(CLIPS.lines[lv])[run.task]), lv === 3 ? 1100 : 450);
+  if (demo) return;
+  const w = $("rWake");
+  w.textContent = kind === "off" ? "딴 화면! " + (app || "") : (lv === 3 ? "집중해! " : "다시! ") + TASKS[run.task]; w.hidden = false;
+  $("run").classList.remove("flash"); void $("run").offsetWidth; $("run").classList.add("flash");
+  clearTimeout(w._t); w._t = setTimeout(() => { w.hidden = true; $("run").classList.remove("flash"); }, 2600);
+  if (window.focusApp && focusApp.alert) focusApp.alert();
+}
+// random checks: "집중하고 있어요?" -> answer within 7 s or it counts as a drift
+let probeT = null, probeOpen = null;
+function scheduleProbe(sec) { clearTimeout(probeT); if (run && S.probe) probeT = setTimeout(openProbe, sec * 1000); }
+const randomProbe = () => scheduleProbe(90 + Math.random() * 150);
+function closeProbe() { clearTimeout(probeOpen); probeOpen = null; $("probe").hidden = true; }
+function openProbe() {
+  if (!run || probeOpen || run.end - Date.now() < 12000) return;
+  run.probes++;
+  $("probe").hidden = false;
+  tone("sine", 880, 880, 0.12, 0.35); tone("sine", 1175, 1175, 0.14, 0.35, 0.16);
+  if (S.wake && CLIPS) setTimeout(() => play(pick(CLIPS.probe)), 350);
+  probeOpen = setTimeout(() => { closeProbe(); if (run) { run.missed++; drift(true); } }, 7000);
+}
+function here() {
+  if (!probeOpen) return;
+  closeProbe(); run.ok++;
+  tone("sine", 988, 988, 0.15, 0.3);
+  randomProbe();
+}
 function start() {
   beep(660, 0.25);
-  run = { t: Date.now(), end: Date.now() + S.len * 60000, min: S.len, task: S.task, drifts: 0 };
+  run = { t: Date.now(), end: Date.now() + S.len * 60000, min: S.len, task: S.task, drifts: 0, probes: 0, ok: 0, missed: 0, off: [] };
+  $("rWake").hidden = true; closeProbe(); randomProbe();
   $("home").hidden = true; $("end").hidden = true; $("run").hidden = false;
   $("rTask").textContent = TASKS[S.task]; $("rMarks").textContent = "";
-  if (window.focusApp) focusApp.block(true).then(keys => {
-    $("rHint").textContent = keys.length ? keys.join(" · ").replace("Control+Shift+D", "Ctrl+Shift+D") + " = 딴생각" : "단축키 안 됨 · 버튼을 누르세요";
+  if (window.focusApp) focusApp.block(true, S.task).then(keys => {
+    $("rHint").textContent = keys.drift.length ? keys.drift[0] + " 딴생각" + (keys.here.length ? " · " + keys.here[0] + " 네" : "") : "단축키 안 됨 · 버튼을 누르세요";
+    $("probeKey").textContent = keys.here.join(" · ").replace("Control+Shift+", "Ctrl+Shift+");
     document.body.classList.add("mini");
   });
   try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => lock = l).catch(() => {}); } catch (e) {}
@@ -214,15 +304,20 @@ function tick() {
   if (left <= 0) return finish(true);
   setTimeout(tick, 250);
 }
-function drift() {
+function drift(kind, app) {
   if (!run) return;
-  run.drifts++; beep(330, 0.12);
+  if (probeOpen) closeProbe();
+  run.drifts++;
+  if (kind === "off") run.off.push(app);
   $("rMarks").textContent = "•".repeat(run.drifts);
+  wake(kind === true || kind === "off" ? kind : false, false, app);
+  scheduleProbe(30 + Math.random() * 30);   // check that you came back
 }
 function finish(full) {
   if (!run) return;
   const sec = Math.round(Math.min(run.min * 60, (Date.now() - run.t) / 1000));
-  const b = { t: run.t, min: run.min, sec, task: run.task, drifts: run.drifts, full };
+  const b = { t: run.t, min: run.min, sec, task: run.task, drifts: run.drifts, full, probes: run.probes, missed: run.missed, off: run.off };
+  clearTimeout(probeT); closeProbe(); try { if (voiceEl) voiceEl.pause(); } catch (e) {}
   const old = S.len;
   if (!full || b.drifts >= 4) { b.res = "down"; S.len = Math.max(3, S.len - 1); }
   else if (b.drifts <= 1) { b.res = "up"; S.len = Math.min(90, S.len + 1); }
@@ -241,7 +336,7 @@ function showEnd(b, old) {
   v.textContent = b.res === "up" ? `올라감! 다음 블록 ${S.len}분` : b.res === "same" ? `유지 · 다음도 ${S.len}분` : `다음 블록 ${S.len}분`;
   const prevClean = S.log.slice(0, -1).filter(x => x.full && x.drifts <= 1).map(x => x.min);
   const pb = b.res === "up" && (!prevClean.length || b.min > Math.max(...prevClean));
-  $("eLine").innerHTML = `${mmss(b.sec)} 집중 · 딴생각 ${b.drifts}번${b.full ? "" : " · 중간에 그만둠"}${pb ? " · <b style='color:var(--gold)'>새 최고 기록!</b>" : ""}`;
+  $("eLine").innerHTML = `${mmss(b.sec)} 집중 · 딴생각 ${b.drifts}번${b.probes ? ` · 체크 ${b.probes - b.missed}/${b.probes}` : ""}${b.off && b.off.length ? ` · 딴 화면: ${[...new Set(b.off)].join(", ")}` : ""}${b.full ? "" : " · 중간에 그만둠"}${pb ? " · <b style='color:var(--gold)'>새 최고 기록!</b>" : ""}`;
   // break = a fifth of the block, at least 1 minute
   let br = Math.max(60, Math.round(b.min * 60 / 5)), bEnd = Date.now() + br * 1000;
   const bt = () => { if ($("end").hidden) return; const l = Math.max(0, (bEnd - Date.now()) / 1000); $("bClock").textContent = mmss(Math.ceil(l)); if (l <= 0) { beep(660, 0.25); return; } setTimeout(bt, 500); };
@@ -251,17 +346,22 @@ function showEnd(b, old) {
 $("start").onclick = start;
 $("next").onclick = start;
 $("home2").onclick = home;
-$("drift").onclick = drift;
+$("drift").onclick = () => drift();
+$("here").onclick = here;
 $("quit").onclick = () => finish(false);
 document.addEventListener("keydown", e => {
   if (e.code === "Space" && run) { e.preventDefault(); drift(); }
+  else if (e.code === "Enter" && run) { e.preventDefault(); here(); }
   else if (e.code === "Enter" && !run && !$("home").hidden) start();
 });
 document.addEventListener("visibilitychange", () => {
   if (run && document.hidden && S.leave && !window.focusApp) drift();
   if (run && !document.hidden) { try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => lock = l).catch(() => {}); } catch (e) {} }
 });
-if (window.focusApp) focusApp.onDrift(drift);
+if (window.focusApp) {
+  focusApp.onDrift(() => drift()); focusApp.onHere(here); focusApp.onOff(app => drift("off", app));
+  focusApp.clips().then(c => CLIPS = c).catch(() => {});
+}
 home();
 </script>
 </body>
