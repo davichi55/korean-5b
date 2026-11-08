@@ -61,6 +61,15 @@
   .legend em{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;font-style:normal}
   .hist{font-size:13px;color:var(--dim);line-height:1.8;margin:0;padding:0;list-style:none}
   .hist b{color:var(--txt);font-variant-numeric:tabular-nums}
+  /* desktop app: while a block runs the window shrinks to a small always-on-top timer */
+  body.mini #run{gap:6px;padding:8px}
+  body.mini #run .clock{font-size:52px}
+  body.mini #rTask{display:none}
+  body.mini #run .hint{font-size:10px;align-self:flex-start;padding-left:4px}
+  body.mini #drift{padding:6px 14px;font-size:13px;border-width:1px}
+  body.mini #run .marks{font-size:14px;min-height:16px;letter-spacing:2px}
+  body.mini #quit{top:auto;bottom:4px;right:4px;padding:3px 8px;font-size:11px}
+  body.mini #run .bar{height:4px}
   @media (max-width:420px){.stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -110,7 +119,7 @@
   <div class="bar"><i id="rBar"></i></div>
   <button id="drift">딴생각 · drifted</button>
   <div class="marks" id="rMarks"></div>
-  <div class="hint">Space = 딴생각</div>
+  <div class="hint" id="rHint">Space = 딴생각</div>
 </div>
 
 <div class="wrap" id="end" hidden>
@@ -142,6 +151,7 @@ function home() {
   $("len").textContent = mmss(S.len * 60);
   $("tasks").innerHTML = TASKS.map((t, i) => `<button class="chip${i === S.task ? " on" : ""}" data-i="${i}">${t}</button>`).join("");
   $("leaveCount").checked = !!S.leave;
+  if (window.focusApp) { $("leaveCount").closest(".row").hidden = true; document.querySelector("header a").hidden = true; }
   const clean = S.log.filter(b => b.full && b.drifts <= 1);
   $("sBest").textContent = clean.length ? Math.max(...clean.map(b => b.min)) + "분" : "–";
   const today = day(Date.now());
@@ -189,6 +199,10 @@ function start() {
   run = { t: Date.now(), end: Date.now() + S.len * 60000, min: S.len, task: S.task, drifts: 0 };
   $("home").hidden = true; $("end").hidden = true; $("run").hidden = false;
   $("rTask").textContent = TASKS[S.task]; $("rMarks").textContent = "";
+  if (window.focusApp) focusApp.block(true).then(keys => {
+    $("rHint").textContent = keys.length ? keys.join(" · ").replace("Control+Shift+D", "Ctrl+Shift+D") + " = 딴생각" : "단축키 안 됨 · 버튼을 누르세요";
+    document.body.classList.add("mini");
+  });
   try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => lock = l).catch(() => {}); } catch (e) {}
   tick();
 }
@@ -215,6 +229,7 @@ function finish(full) {
   else b.res = "same";
   S.log.push(b); save();
   run = null;
+  if (window.focusApp) { document.body.classList.remove("mini"); focusApp.block(false); }
   try { lock && lock.release(); } catch (e) {} lock = null;
   if (full) { beep(784, 0.3); beep(988, 0.4, 0.3); }
   showEnd(b, old);
@@ -243,9 +258,10 @@ document.addEventListener("keydown", e => {
   else if (e.code === "Enter" && !run && !$("home").hidden) start();
 });
 document.addEventListener("visibilitychange", () => {
-  if (run && document.hidden && S.leave) drift();
+  if (run && document.hidden && S.leave && !window.focusApp) drift();
   if (run && !document.hidden) { try { navigator.wakeLock && navigator.wakeLock.request("screen").then(l => lock = l).catch(() => {}); } catch (e) {} }
 });
+if (window.focusApp) focusApp.onDrift(drift);
 home();
 </script>
 </body>
