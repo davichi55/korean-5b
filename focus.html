@@ -68,7 +68,7 @@
     font-size:22px;font-weight:800;color:var(--gold);text-align:center;padding:12px}
   #probe button{padding:12px 28px;border-radius:14px;border:2px solid var(--good);background:transparent;color:var(--good);font-size:18px;font-weight:800;cursor:pointer}
   #probe small{font-size:12px;color:var(--dim);font-weight:400}
-  /* desktop app: while a block runs the window shrinks to a small always-on-top timer */
+  /* desktop app: during a block the window is minimized; opened from the taskbar it is this small timer */
   body.mini #run{gap:4px;padding:6px;justify-content:flex-start;padding-top:8px}
   body.mini #run .clock{font-size:40px}
   body.mini #rTask, body.mini #drift{display:none}
@@ -301,6 +301,8 @@ function tick() {
   const left = Math.max(0, (run.end - Date.now()) / 1000);
   $("rClock").textContent = mmss(Math.ceil(left));
   $("rBar").style.width = (100 - left / (run.min * 60) * 100) + "%";
+  const lbl = mmss(Math.ceil(left));
+  if (window.focusApp && focusApp.progress && lbl !== run.lbl) { run.lbl = lbl; focusApp.progress(1 - left / (run.min * 60), lbl); }
   if (left <= 0) return finish(true);
   setTimeout(tick, 250);
 }
