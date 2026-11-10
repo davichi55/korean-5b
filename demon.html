@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>단어 퇴마사 — Korean 5B</title>
+<meta name="theme-color" content="#1a0b2e">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#1a0b2e; --card:#2a1450; --line:#4b2a86; --txt:#fff6e8; --dim:#c9b6ef; --hot:#ff4f6d; --gold:#ffd23f; --mint:#3ee6a8; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;height:100dvh;background:var(--bg);color:var(--txt);overflow:hidden;
+    font-family:"Jua","Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR","Leelawadee UI","Microsoft YaHei",sans-serif;
+    touch-action:none;user-select:none;-webkit-user-select:none}
+  canvas{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;display:block}
+  [hidden]{display:none!important}
+  .screen{position:fixed;inset:0;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;
+    padding:16px 16px calc(24px + env(safe-area-inset-bottom));background:rgba(20,6,40,.82);backdrop-filter:blur(3px);z-index:5;touch-action:pan-y}
+  .card{margin:auto;width:100%;max-width:520px;background:linear-gradient(170deg,#34195f,#22103f);border:3px solid #5d35a8;
+    border-radius:26px;padding:22px 20px;box-shadow:0 10px 0 #12062a,0 20px 50px rgba(0,0,0,.5);text-align:center}
+  h1{margin:0;font-size:40px;letter-spacing:1px;color:var(--gold);text-shadow:0 4px 0 #b3261e,0 7px 0 #4a0d0a}
+  .sub{color:var(--dim);margin:6px 0 14px;font-size:16px}
+  .grp{text-align:left;margin:12px 0}
+  .gl{font-size:14px;color:var(--dim);margin-bottom:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{border:2px solid var(--line);background:#1d0c38;color:var(--dim);border-radius:999px;padding:6px 12px;font:inherit;font-size:15px;cursor:pointer}
+  .chip small{opacity:.7;font-size:11px;margin-left:4px}
+  .chip.on{background:var(--hot);border-color:#ffb3c0;color:#fff;box-shadow:0 3px 0 #8f1830}
+  select{background:#1d0c38;color:var(--txt);border:2px solid var(--line);border-radius:12px;padding:6px 10px;font:inherit;font-size:15px}
+  .row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .count{color:var(--mint);font-size:15px;margin:8px 0}
+  .count.bad{color:var(--hot)}
+  .big{display:block;width:100%;margin:12px 0 6px;border:0;border-radius:18px;padding:14px;font:inherit;font-size:26px;cursor:pointer;
+    color:#3a1500;background:linear-gradient(#ffe066,#ffb627);box-shadow:0 6px 0 #b86b00,0 10px 20px rgba(0,0,0,.35)}
+  .big:active{transform:translateY(4px);box-shadow:0 2px 0 #b86b00}
+  .big:disabled{filter:grayscale(1);opacity:.5}
+  .ghost{background:#1d0c38;color:var(--txt);border:2px solid var(--line);border-radius:14px;padding:10px 16px;font:inherit;font-size:17px;cursor:pointer}
+  .how{font-size:14px;color:var(--dim);line-height:1.5;text-align:left;background:#1d0c38;border-radius:14px;padding:10px 12px;margin-top:10px}
+  .how b{color:var(--gold)}
+  .best{color:var(--gold);margin-top:8px;font-size:15px}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:14px 0}
+  .stat{background:#1d0c38;border-radius:14px;padding:10px}
+  .stat b{display:block;font-size:28px;color:var(--gold)}
+  .stat span{font-size:13px;color:var(--dim)}
+  .missed{text-align:left;max-height:34vh;overflow:auto;background:#1d0c38;border-radius:14px;padding:6px 12px}
+  .missed div{padding:6px 0;border-bottom:1px dashed #3d2270;font-size:16px}
+  .missed div:last-child{border:0}
+  .missed .m{color:var(--dim);font-size:14px;margin-left:6px}
+  .btnrow{display:flex;gap:10px}
+  .btnrow>*{flex:1}
+  #pauseBtn,#muteBtn{position:fixed;top:calc(8px + env(safe-area-inset-top));z-index:4;width:40px;height:40px;border-radius:12px;border:2px solid #5d35a8;
+    background:rgba(29,12,56,.8);color:#fff;font-size:18px;cursor:pointer;padding:0}
+  #pauseBtn{left:50%;transform:translateX(-50%)}
+  #muteBtn{left:calc(50% + 26px)}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<button id="pauseBtn" hidden title="Pause">⏸</button>
+
+<div class="screen" id="menu">
+  <div class="card">
+    <h1>단어 퇴마사</h1>
+    <div class="sub" data-i="tag">Word Exorcist</div>
+    <div class="row"><span class="gl" data-i="lang">Meaning language</span><select id="lang"></select></div>
+    <div class="grp"><div class="gl" data-i="chapters">Chapters</div><div class="chips" id="chChips"></div></div>
+    <div class="grp"><div class="gl" data-i="classes">Classes</div><div class="chips" id="clsChips"></div></div>
+    <div class="row"><button class="chip" id="starChip">★ <span data-i="star">Priority words only</span></button><span class="count" id="count"></span></div>
+    <button class="big" id="startBtn">▶ <span data-i="start">Start</span></button>
+    <div class="how" data-i="how"></div>
+    <div class="best" id="bestLine"></div>
+  </div>
+</div>
+
+<div class="screen" id="pause" hidden>
+  <div class="card">
+    <h1>⏸</h1>
+    <button class="big" id="resumeBtn" data-i="resume">Resume</button>
+    <div class="btnrow"><button class="ghost" id="muteBtn2"></button><button class="ghost" id="quitBtn" data-i="quit">Quit</button></div>
+  </div>
+</div>
+
+<div class="screen" id="over" hidden>
+  <div class="card">
+    <h1 data-i="over">Game over</h1>
+    <div class="stats">
+      <div class="stat"><b id="sScore">0</b><span data-i="score">Score</span></div>
+      <div class="stat"><b id="sKills">0</b><span data-i="kills">Demons</span></div>
+      <div class="stat"><b id="sCombo">0</b><span data-i="combo">Best combo</span></div>
+      <div class="stat"><b id="sAcc">0%</b><span data-i="acc">Accuracy</span></div>
+    </div>
+    <div class="best" id="newBest"></div>
+    <div class="gl" style="text-align:left;margin-top:10px" data-i="missed">Words to review</div>
+    <div class="missed" id="missedList"></div>
+    <button class="big" id="againBtn">↻ <span data-i="again">Again</span></button>
+    <button class="ghost" id="menuBtn" style="width:100%" data-i="menu">Menu</button>
+  </div>
+</div>
+
+<script>
+/* ============================== data (build_demon.js) ============================== */
+const CARDS = [["기왕",{"en":"anyway","zh":"既然、反正","th":"ยังไงก็ตาม","ru":"всё равно","vi":"dù sao thì","zht":"既然、反正"},1,"ch1-v"],["적금",{"en":"installment savings","zh":"零存整取储蓄","th":"บัญชีออมทรัพย์แบบผ่อนส่งรายเดือน","ru":"накопительный вклад","vi":"tiền gửi tiết kiệm trả góp định kỳ","zht":"零存整取儲蓄"},0,"ch1-v"],["빡빡하다",{"en":"to be packed / tight","zh":"紧巴巴、排得很满","th":"แน่น, ตึง, เข้มงวด","ru":"быть плотным, напряжённым","vi":"chặt chẽ, dày đặc, kín","zht":"緊巴巴、排得很滿"},1,"ch1-v"],["주간지",{"en":"weekly magazine","zh":"周刊","th":"นิตยสารรายสัปดาห์","ru":"еженедельный журнал","vi":"tạp chí tuần","zht":"週刊"},0,"ch1-v"],["곧잘",{"en":"quite well","zh":"还挺会、动不动就、经常","th":"ค่อนข้างเก่ง, ทำได้ดีพอควร","ru":"довольно хорошо","vi":"khá giỏi, làm khá tốt","zht":"還挺會、動不動就、經常"},1,"ch1-v"],["과음하다",{"en":"to drink too much","zh":"喝酒过量","th":"ดื่มเหล้ามากเกินไป","ru":"слишком много пить","vi":"uống rượu quá nhiều","zht":"喝酒過量"},1,"ch1-v"],["접대",{"en":"entertaining / receiving guests","zh":"招待","th":"การรับรองแขก","ru":"приём гостей, клиентов","vi":"tiếp đãi","zht":"招待"},0,"ch1-v"],["괜히",{"en":"for no reason","zh":"无缘无故、白白地","th":"ไม่มีเหตุผล, เปล่า ๆ","ru":"без причины","vi":"vô cớ, vô ích","zht":"無緣無故、白白地"},0,"ch1-v"],["타령",{"en":"harping on about","zh":"老是念叨、老调重弹","th":"การพร่ำบ่นเรื่องเดิม ๆ","ru":"нытьё","vi":"cứ nhắc đi nhắc lại","zht":"老是念叨、老調重彈"},0,"ch1-v"],["손주",{"en":"grandchild","zh":"孙子孙女、外孙","th":"หลาน","ru":"внуки","vi":"cháu","zht":"孫子孫女、外孫"},0,"ch1-v"],["간만",{"en":"a long while","zh":"好久、隔了好久","th":"นานแล้ว, นานทีเดียว","ru":"давно","vi":"lâu lắm rồi mới","zht":"好久、隔了好久"},1,"ch1-v"],["표",{"en":"unit / pack","zh":"份、包","th":"หน่วยนับ: ชุด/แพ็ก","ru":"счётное слово: штука, комплект","vi":"gói, phần","zht":"份、包"},0,"ch1-v"],["일자리",{"en":"job","zh":"工作岗位、职位","th":"งาน, ตำแหน่งงาน","ru":"работа","vi":"việc làm, chỗ làm","zht":"工作崗位、職位"},0,"ch1-v"],["옜다",{"en":"here","zh":"喏、给你","th":"นี่ไง, เอ้า","ru":"на, держи","vi":"này, cầm lấy đi","zht":"喏、給你"},0,"ch1-v"],["보태다",{"en":"to add","zh":"添补、凑上","th":"เพิ่มเติม, ช่วยสมทบ","ru":"добавлять","vi":"thêm vào, góp thêm","zht":"添補、湊上"},1,"ch1-v"],["내밀다",{"en":"to stick out","zh":"伸出、递出、探出","th":"ยื่นออกไป, ยื่นมือ","ru":"высовывать","vi":"đưa ra, chìa ra, thò ra","zht":"伸出、遞出、探出"},1,"ch1-v"],["장사",{"en":"business","zh":"生意、买卖","th":"การค้า, ธุรกิจค้าขาย","ru":"торговля","vi":"việc buôn bán, kinh doanh","zht":"生意、買賣"},0,"ch1-v"],["깨작깨작하다",{"en":"to pick at","zh":"挑挑拣拣地吃","th":"จิ้มกินนิดหน่อย, ทำแบบขอไปที","ru":"ковыряться в еде","vi":"ăn nhón nhén, ăn qua loa","zht":"挑挑揀揀地吃"},0,"ch1-v"],["눈치가 보이다",{"en":"to feel self-conscious","zh":"看别人脸色、顾忌他人眼光","th":"รู้สึกเกรงใจ, กังวลสายตาคนอื่น","ru":"чувствовать неловкость","vi":"cảm thấy ngại","zht":"看別人臉色、顧忌他人眼光"},1,"ch1-v"],["입을 틔우다",{"en":"to help someone start to talk / open up","zh":"让人开口、帮人打开话匣子","th":"ช่วยให้อีกฝ่ายเริ่มพูด/เปิดใจ","ru":"помочь разговориться","vi":"giúp ai bắt đầu nói","zht":"讓人開口、幫人開啟話匣子"},0,"ch1-v"],["업어 키우다",{"en":"to raise carried on one's back","zh":"背着养大、溺爱地养大","th":"แบกเลี้ยงลูกไว้บนหลัง","ru":"растить ребёнка","vi":"cõng nuôi lớn","zht":"揹著養大、溺愛地養大"},0,"ch1-v"],["가요계",{"en":"the pop-music industry / scene","zh":"歌坛、流行音乐界","th":"วงการเพลงป็อป","ru":"поп-индустрия","vi":"làng nhạc đại chúng","zht":"歌壇、流行音樂界"},1,"ch1-r"],["근본적",{"en":"fundamental","zh":"根本的、基本的","th":"ขั้นพื้นฐาน, โดยหลักการ","ru":"основной, фундаментальный","vi":"mang tính căn bản, cơ bản","zht":"根本的、基本的"},0,"ch1-r"],["논란",{"en":"controversy","zh":"争议、争论","th":"ข้อโต้เถียง, ประเด็นขัดแย้ง","ru":"спор, полемика, скандал","vi":"tranh cãi","zht":"爭議、爭論"},1,"ch1-r"],["동시",{"en":"simultaneity","zh":"同时","th":"พร้อมกัน, ในเวลาเดียวกัน","ru":"одновременность","vi":"đồng thời, cùng lúc","zht":"同時"},1,"ch1-r"],["립싱크",{"en":"lip-sync","zh":"对口型","th":"การลิปซิงค์","ru":"липсинк, пение под фонограмму","vi":"hát nhép","zht":"對口型"},0,"ch1-r"],["말솜씨",{"en":"speaking skill","zh":"口才","th":"ฝีปาก, ทักษะการพูด","ru":"красноречие","vi":"tài ăn nói","zht":"口才"},0,"ch1-r"],["오락",{"en":"entertainment","zh":"娱乐、游戏","th":"ความบันเทิง","ru":"развлечение","vi":"giải trí, trò chơi","zht":"娛樂、遊戲"},0,"ch1-r"],["증거",{"en":"evidence","zh":"证据","th":"หลักฐาน","ru":"доказательство","vi":"bằng chứng, chứng cứ","zht":"證據"},0,"ch1-r"],["가꾸다",{"en":"to cultivate","zh":"栽培、打理、修饰","th":"ดูแลปลูก, ตกแต่งดูแล, บำรุง","ru":"ухаживать","vi":"chăm sóc, trau chuốt","zht":"栽培、打理、修飾"},1,"ch1-r"],["끊이다",{"en":"to cease","zh":"断绝、中断、不断","th":"ขาดตอน, หยุดชะงัก","ru":"прерываться","vi":"bị gián đoạn, ngớt, dứt","zht":"斷絕、中斷、不斷"},0,"ch1-r"],["맞추다",{"en":"to match","zh":"配合、调整、对准","th":"ปรับให้เข้ากัน, ตั้งให้ตรง","ru":"подбирать","vi":"làm cho khớp, điều chỉnh","zht":"配合、調整、對準"},0,"ch1-r"],["선호하다",{"en":"to prefer","zh":"偏爱、更喜欢","th":"ชอบมากกว่า, นิยม","ru":"предпочитать","vi":"ưa chuộng hơn, thích hơn","zht":"偏愛、更喜歡"},0,"ch1-r"],["열창하다",{"en":"to sing passionately","zh":"热情演唱、卖力地唱","th":"ร้องเพลงอย่างสุดตัว","ru":"петь с жаром, самозабвенно","vi":"hát hết mình, hát say sưa","zht":"熱情演唱、賣力地唱"},0,"ch1-r"],["자랑하다",{"en":"to boast","zh":"夸耀、炫耀","th":"คุยโว, อวด","ru":"хвастаться","vi":"khoe khoang, tự hào","zht":"誇耀、炫耀"},0,"ch1-r"],["출연하다",{"en":"to appear","zh":"出演、登场","th":"ปรากฏตัวในรายการ/ภาพยนตร์","ru":"выступать, сниматься","vi":"xuất hiện, tham gia diễn","zht":"出演、登場"},1,"ch1-r"],["키우다",{"en":"to raise","zh":"养育、培养、饲养","th":"เลี้ยงดู, ปลูก, พัฒนา","ru":"растить","vi":"nuôi, trồng, phát triển","zht":"養育、培養、飼養"},0,"ch1-r"],["홍보하다",{"en":"to promote","zh":"宣传、推广","th":"โปรโมต, ประชาสัมพันธ์","ru":"рекламировать","vi":"quảng bá, tuyên truyền","zht":"宣傳、推廣"},0,"ch1-r"],["격렬하다",{"en":"to be intense","zh":"激烈、猛烈","th":"รุนแรง, ดุเดือด","ru":"быть яростным, жёстким","vi":"dữ dội, khốc liệt","zht":"激烈、猛烈"},1,"ch1-r"],["뛰어나다",{"en":"to be outstanding","zh":"出众、卓越","th":"โดดเด่น, ยอดเยี่ยม","ru":"выдающийся, отличный","vi":"xuất sắc, nổi bật","zht":"出眾、卓越"},1,"ch1-r"],["열악하다",{"en":"to be poor","zh":"恶劣、简陋","th":"ย่ำแย่, ด้อยคุณภาพ","ru":"быть плохим, неблагоприятным","vi":"tồi tệ, kém, thiếu thốn","zht":"惡劣、簡陋"},1,"ch1-r"],["개봉",{"en":"release","zh":"上映","th":"การเข้าฉาย","ru":"выход фильма в прокат","vi":"ra mắt, công chiếu","zht":"上映"},0,"ch1-r"],["관람",{"en":"viewing","zh":"观看、观赏","th":"การชม, การดู","ru":"просмотр","vi":"xem, thưởng thức","zht":"觀看、觀賞"},0,"ch1-r"],["눈물바다",{"en":"a sea of tears","zh":"泪海、哭成一片","th":"ทะเลน้ำตา","ru":"море слёз","vi":"biển nước mắt, khóc như mưa","zht":"淚海、哭成一片"},0,"ch1-r"],["달리기",{"en":"running","zh":"跑步","th":"การวิ่ง","ru":"бег","vi":"chạy bộ, môn chạy","zht":"跑步"},0,"ch1-r"],["대사",{"en":"lines","zh":"台词","th":"บทพูด, บทสนทนา","ru":"реплики","vi":"lời thoại","zht":"臺詞"},0,"ch1-r"],["등급",{"en":"grade","zh":"等级、级别","th":"ระดับ, ชั้น, เรต","ru":"класс","vi":"cấp bậc, hạng, xếp loại","zht":"等級、級別"},0,"ch1-r"],["만족",{"en":"satisfaction","zh":"满足、满意","th":"ความพอใจ","ru":"удовлетворение","vi":"sự hài lòng, thỏa mãn","zht":"滿足、滿意"},0,"ch1-r"],["말다툼",{"en":"quarrel","zh":"争吵、口角","th":"การทะเลาะ, เถียงกัน","ru":"ссора, перепалка","vi":"cãi nhau, cãi vã","zht":"爭吵、口角"},0,"ch1-r"],["몸매",{"en":"figure","zh":"身材","th":"รูปร่าง","ru":"фигура, телосложение","vi":"vóc dáng, dáng người","zht":"身材"},0,"ch1-r"],["방귀",{"en":"fart","zh":"屁","th":"ผายลม, ตด","ru":"пук","vi":"cái rắm, đánh rắm","zht":"屁"},0,"ch1-r"],["불 (弗)",{"en":"dollar","zh":"美元","th":"ดอลลาร์","ru":"доллар","vi":"đô la","zht":"美元"},0,"ch1-r"],["상영",{"en":"screening","zh":"放映","th":"การฉาย","ru":"показ","vi":"chiếu phim, trình chiếu","zht":"放映"},0,"ch1-r"],["수준",{"en":"level","zh":"水平、水准","th":"ระดับ, มาตรฐาน","ru":"уровень","vi":"trình độ, mức độ","zht":"水平、水準"},1,"ch1-r"],["자폐증",{"en":"autism","zh":"自闭症","th":"ออทิสติก","ru":"аутизм","vi":"bệnh tự kỷ","zht":"自閉症"},0,"ch1-r"],["동고동락하다",{"en":"to share joys and sorrows","zh":"同甘共苦","th":"ร่วมสุขร่วมทุกข์","ru":"делить радости и горести","vi":"đồng cam cộng khổ","zht":"同甘共苦"},1,"ch2-v"],["복지관",{"en":"community welfare center","zh":"福利馆、社区福利中心","th":"ศูนย์สวัสดิการสังคม","ru":"центр социального обслуживания","vi":"trung tâm phúc lợi xã hội","zht":"福利館、社群福利中心"},0,"ch2-v"],["코치",{"en":"coach","zh":"教练","th":"โค้ช","ru":"тренер","vi":"huấn luyện viên","zht":"教練"},0,"ch2-v"],["노친네",{"en":"old person","zh":"老头儿、老家伙","th":"คนแก่, ลุงป้า","ru":"старикан","vi":"ông già, bà già","zht":"老頭兒、老傢伙"},0,"ch2-v"],["실버 스포츠",{"en":"silver sports","zh":"银发运动","th":"ซิลเวอร์สปอร์ต","ru":"спорт для пожилых","vi":"thể thao dành cho người cao tuổi","zht":"銀髮運動"},0,"ch2-v"],["뜨다",{"en":"to rise","zh":"升起","th":"ขึ้นมา, ดังขึ้น, เป็นที่นิยม","ru":"всходить","vi":"nổi lên, trở nên nổi tiếng","zht":"升起"},1,"ch2-v"],["유망주",{"en":"a rising star","zh":"潜力新星、有前途的人","th":"ดาวรุ่ง, ผู้มีแววรุ่งโรจน์","ru":"многообещающий новичок","vi":"ngôi sao triển vọng","zht":"潛力新星、有前途的人"},0,"ch2-v"],["어마무시하다",{"en":"to be enormous / tremendous","zh":"极其庞大、惊人、了不得","th":"มหึมา, ยิ่งใหญ่น่าทึ่ง","ru":"огромный, невероятный","vi":"kinh khủng, ghê gớm","zht":"極其龐大、驚人、了不得"},1,"ch2-v"],["엎드리다",{"en":"to lie face down","zh":"趴下、俯身","th":"นอนคว่ำ, ก้มตัวลง","ru":"лежать ничком","vi":"nằm sấp, cúi rạp xuống","zht":"趴下、俯身"},1,"ch2-v"],["기본기",{"en":"basic skills","zh":"基本功","th":"พื้นฐาน, ทักษะพื้นฐาน","ru":"азы","vi":"kỹ năng cơ bản, nền tảng","zht":"基本功"},1,"ch2-v"],["영업",{"en":"business","zh":"营业、销售","th":"การขาย, ธุรกิจ, งานขาย","ru":"бизнес","vi":"kinh doanh, bán hàng","zht":"營業、銷售"},0,"ch2-v"],["누님",{"en":"older sister","zh":"姐姐","th":"พี่สาว","ru":"старшая сестра","vi":"chị","zht":"姐姐"},0,"ch2-v"],["허전하다",{"en":"to feel empty / hollow","zh":"空落落、若有所失","th":"รู้สึกโหวง ๆ, ว่างเปล่า","ru":"чувствовать пустоту","vi":"trống trải, hụt hẫng","zht":"空落落、若有所失"},1,"ch2-v"],["알바(를) 뛰다",{"en":"to work a part-time job","zh":"打零工、做兼职","th":"ทำงานพาร์ทไทม์","ru":"подрабатывать","vi":"đi làm thêm","zht":"打零工、做兼職"},0,"ch2-v"],["목이 좋다",{"en":"to be a good location / spot","zh":"地段好、位置好","th":"ทำเลดี","ru":"иметь выгодное расположение","vi":"vị trí đẹp","zht":"地段好、位置好"},1,"ch2-v"],["이래 봬도",{"en":"even though it looks this way","zh":"别看我这样","th":"ถึงจะดูเป็นแบบนี้ แต่","ru":"хоть я и выгляжу так","vi":"dù trông thế này nhưng","zht":"別看我這樣"},1,"ch2-v"],["뚝 떨어지다",{"en":"to drop sharply","zh":"骤降、猛地下降","th":"ตกฮวบ, ลดลงทันที","ru":"резко упасть","vi":"giảm mạnh, tụt thẳng xuống","zht":"驟降、猛地下降"},0,"ch2-v"],["기가 막히게",{"en":"amazingly","zh":"好得惊人、好得没话说","th":"อย่างน่าทึ่ง, เก่งมาก","ru":"потрясающе","vi":"tuyệt vời, giỏi không tưởng","zht":"好得驚人、好得沒話說"},1,"ch2-v"],["장르",{"en":"genre","zh":"类型、体裁","th":"แนว, ประเภท","ru":"жанр","vi":"thể loại","zht":"型別、體裁"},0,"ch2-r"],["재능",{"en":"talent","zh":"才能、天赋","th":"พรสวรรค์","ru":"талант","vi":"tài năng","zht":"才能、天賦"},0,"ch2-r"],["조연",{"en":"supporting role","zh":"配角","th":"บทสมทบ","ru":"роль второго плана","vi":"vai phụ","zht":"配角"},0,"ch2-r"],["주연",{"en":"lead role","zh":"主角、主演","th":"บทนำ, ตัวเอก","ru":"главная роль","vi":"vai chính","zht":"主角、主演"},0,"ch2-r"],["지능",{"en":"intelligence","zh":"智力、智能","th":"สติปัญญา","ru":"интеллект","vi":"trí tuệ, trí thông minh","zht":"智力、智慧"},0,"ch2-r"],["집착",{"en":"obsession","zh":"执着、迷恋","th":"ความหมกมุ่น, ความยึดติด","ru":"одержимость","vi":"ám ảnh, bám chặt, chấp niệm","zht":"執著、迷戀"},0,"ch2-r"],["출연",{"en":"appearance","zh":"出演、上节目","th":"การปรากฏตัว, การแสดง","ru":"выступление, появление","vi":"sự xuất hiện","zht":"出演、上節目"},0,"ch2-r"],["후반부",{"en":"the latter half","zh":"后半部分","th":"ครึ่งหลัง, ช่วงหลัง","ru":"вторая половина","vi":"nửa sau, phần sau","zht":"後半部分"},0,"ch2-r"],["괴로워하다",{"en":"to suffer","zh":"痛苦、苦恼","th":"ทุกข์ใจ, ทรมานใจ","ru":"страдать","vi":"đau khổ, khổ sở","zht":"痛苦、苦惱"},1,"ch2-r"],["착각하다",{"en":"to be mistaken","zh":"误会、搞错","th":"เข้าใจผิด, คิดผิด","ru":"ошибаться","vi":"nhầm lẫn, tưởng nhầm","zht":"誤會、搞錯"},0,"ch2-r"],["훌쩍거리다",{"en":"to sniffle","zh":"抽抽搭搭地哭、吸鼻子","th":"สะอึกสะอื้น, สูดน้ำมูก","ru":"шмыгать носом","vi":"sụt sịt, nức nở","zht":"抽抽搭搭地哭、吸鼻子"},0,"ch2-r"],["귀찮다",{"en":"to be bothersome / annoying","zh":"麻烦、嫌烦","th":"น่ารำคาญ, ขี้เกียจทำ","ru":"быть хлопотным, докучливым","vi":"phiền phức, lười, ngại","zht":"麻煩、嫌煩"},0,"ch2-r"],["불성실하다",{"en":"to be insincere","zh":"不诚实、不认真","th":"ไม่จริงใจ, ไม่ซื่อสัตย์","ru":"быть недобросовестным","vi":"không thành thật","zht":"不誠實、不認真"},0,"ch2-r"],["뻔하다",{"en":"to be obvious","zh":"显而易见、一眼可知","th":"เห็นอยู่ชัด ๆ, คาดเดาได้","ru":"быть очевидным, предсказуемым","vi":"rõ ràng, dễ đoán, sáo mòn","zht":"顯而易見、一眼可知"},1,"ch2-r"],["순수하다",{"en":"to be pure","zh":"纯粹、纯真","th":"บริสุทธิ์, ใสซื่อ","ru":"быть чистым, невинным","vi":"trong sáng, thuần khiết","zht":"純粹、純真"},1,"ch2-r"],["어색하다",{"en":"to be awkward","zh":"尴尬、不自然","th":"เก้อเขิน, ไม่เป็นธรรมชาติ","ru":"быть неловким, неестественным","vi":"ngượng ngùng, gượng gạo","zht":"尷尬、不自然"},1,"ch2-r"],["허술하다",{"en":"to be shabby","zh":"简陋、马虎、不牢靠","th":"ไม่รอบคอบ, หละหลวม, ไม่แข็งแรง","ru":"быть неряшливым, халтурным","vi":"sơ sài, cẩu thả, lỏng lẻo","zht":"簡陋、馬虎、不牢靠"},1,"ch2-r"],["강추",{"en":"a strong recommendation","zh":"强烈推荐","th":"การแนะนำอย่างแรง","ru":"настоятельная рекомендация","vi":"sự giới thiệu mạnh mẽ","zht":"強烈推薦"},0,"ch2-r"],["가슴이 찡하다",{"en":"to be deeply moved","zh":"心里一酸、很感动","th":"ซึ้งใจ, ประทับใจจนใจสั่น","ru":"тронуть до глубины души","vi":"cảm động, xúc động trong lòng","zht":"心裡一酸、很感動"},1,"ch2-r"],["말이 필요 없다",{"en":"needs no words","zh":"无需多说、不言而喻","th":"ไม่ต้องพูดอะไรมาก","ru":"слов не надо","vi":"không cần nói nhiều","zht":"無需多說、不言而喻"},1,"ch2-r"],["냇가",{"en":"streamside","zh":"溪边、河边","th":"ริมลำธาร","ru":"берег ручья, речки","vi":"bờ suối, ven suối","zht":"溪邊、河邊"},0,"ch2-r"],["도깨비",{"en":"goblin","zh":"鬼怪","th":"โดกแก็บ","ru":"токкэби","vi":"yêu tinh dokkaebi","zht":"鬼怪"},0,"ch2-r"],["마음씨",{"en":"disposition","zh":"心地、心肠","th":"นิสัยใจคอ","ru":"нрав","vi":"tấm lòng, bản tính","zht":"心地、心腸"},1,"ch2-r"],["박",{"en":"gourd","zh":"葫芦","th":"น้ำเต้า","ru":"тыква-горлянка","vi":"quả bầu","zht":"葫蘆"},0,"ch2-r"],["엉망",{"en":"a mess","zh":"一团糟、乱七八糟","th":"ความยุ่งเหยิง, เละเทะ","ru":"беспорядок","vi":"bừa bộn, rối tung, tan hoang","zht":"一團糟、亂七八糟"},1,"ch2-r"],["욕심꾸러기",{"en":"a greedy person","zh":"贪心鬼、贪婪的人","th":"คนโลภ","ru":"жадина","vi":"người tham lam","zht":"貪心鬼、貪婪的人"},1,"ch2-r"],["유언",{"en":"a will","zh":"遗言、遗嘱","th":"พินัยกรรม, คำสั่งเสีย","ru":"завещание","vi":"di chúc, lời trăn trối","zht":"遺言、遺囑"},1,"ch2-r"],["자리",{"en":"spot","zh":"位置、座位","th":"ที่นั่ง, ตำแหน่ง, ที่","ru":"место","vi":"chỗ, chỗ ngồi","zht":"位置、座位"},0,"ch2-r"],["제비",{"en":"swallow","zh":"燕子","th":"นกนางแอ่น","ru":"ласточка","vi":"chim én","zht":"燕子"},0,"ch2-r"],["청개구리",{"en":"tree frog","zh":"青蛙","th":"กบเขียว","ru":"древесная лягушка","vi":"ếch xanh","zht":"青蛙"},0,"ch2-r"],["푼",{"en":"penny","zh":"一分钱、一点点钱","th":"เศษเงินเล็กน้อย, สตางค์","ru":"грош","vi":"đồng xu, một xu","zht":"一分錢、一點點錢"},0,"ch2-r"],["가져다주다",{"en":"to bring","zh":"带来、拿来给","th":"นำมาให้","ru":"принести","vi":"mang đến cho","zht":"帶來、拿來給"},0,"ch2-r"],["떠내려가다",{"en":"to be washed away","zh":"被冲走、顺流漂走","th":"ถูกน้ำพัดไป, ลอยไปตามน้ำ","ru":"быть унесённым течением","vi":"bị cuốn trôi","zht":"被沖走、順流漂走"},0,"ch2-r"],["물다",{"en":"to bite","zh":"咬、叼、含","th":"กัด, คาบ","ru":"кусать","vi":"cắn, ngậm","zht":"咬、叼、含"},1,"ch2-r"],["물려받다",{"en":"to inherit","zh":"继承、承接","th":"รับช่วงมา, รับมรดก","ru":"унаследовать","vi":"thừa hưởng, nhận lại","zht":"繼承、承接"},1,"ch2-r"],["부러뜨리다",{"en":"to break","zh":"折断、弄断","th":"หัก, ทำให้หัก","ru":"ломать","vi":"làm gãy, bẻ gãy","zht":"折斷、弄斷"},0,"ch2-r"],["쫓겨나다",{"en":"to be driven out","zh":"被赶出去、被驱逐","th":"ถูกไล่ออก, ถูกขับไล่","ru":"быть изгнанным","vi":"bị đuổi ra, bị trục xuất","zht":"被趕出去、被驅逐"},1,"ch2-r"],["쫓아내다",{"en":"to drive out","zh":"赶走、撵出去","th":"ไล่ออก, ขับไล่","ru":"выгнать","vi":"đuổi ra, đuổi đi","zht":"趕走、攆出去"},1,"ch2-r"],["혼내다",{"en":"to scold","zh":"训斥、责骂","th":"ดุ, ตำหนิ","ru":"отчитывать","vi":"mắng, phạt, quở trách","zht":"訓斥、責罵"},1,"ch2-r"],["놀랍다",{"en":"to be surprising","zh":"惊人、令人吃惊","th":"น่าตกใจ, น่าทึ่ง","ru":"быть удивительным","vi":"đáng ngạc nhiên, kinh ngạc","zht":"驚人、令人吃驚"},0,"ch2-r"],["심술궂다",{"en":"to be spiteful","zh":"刁钻、使坏、脾气坏","th":"ใจร้าย, ขี้อิจฉาชอบแกล้ง","ru":"быть злобным, вредным","vi":"ác ý, xấu tính, hay hờn dỗi","zht":"刁鑽、使壞、脾氣壞"},0,"ch2-r"],["개굴개굴",{"en":"ribbit","zh":"呱呱","th":"อ๊บ ๆ","ru":"ква-ква","vi":"ộp ộp","zht":"呱呱"},0,"ch2-r"],["정성껏",{"en":"with all one's heart","zh":"精心地、尽心尽力地","th":"ด้วยความตั้งใจเต็มที่","ru":"от всей души","vi":"hết lòng, tận tâm, chu đáo","zht":"精心地、盡心盡力地"},1,"ch2-r"],["꼬르륵",{"en":"growl / gurgle","zh":"咕噜","th":"เสียงท้องร้องโครกคราก","ru":"урчание, бульканье","vi":"ục ục","zht":"咕嚕"},0,"ch2-r"],["꾸벅꾸벅",{"en":"nodding off","zh":"一点一点地打瞌睡","th":"พยักหน้าหงึก ๆ","ru":"клевать носом","vi":"gật gù","zht":"一點一點地打瞌睡"},0,"ch2-r"],["뚝",{"en":"abruptly","zh":"突然、啪地断开","th":"ผัวะ, ฉับพลัน","ru":"резко","vi":"đột ngột, phụt","zht":"突然、啪地斷開"},0,"ch2-r"],["벌떡",{"en":"springing up abruptly","zh":"猛地","th":"ผลุนผลันลุกขึ้น, พรวดพราด","ru":"вскочить рывком","vi":"bật dậy","zht":"猛地"},0,"ch2-r"],["벌컥벌컥",{"en":"gulping","zh":"咕咚咕咚","th":"กลืนโครก ๆ","ru":"жадно, большими глотками","vi":"ừng ực","zht":"咕咚咕咚"},0,"ch2-r"],["빙빙",{"en":"round and round","zh":"团团转、一圈一圈地","th":"หมุนติ้ว, วนไปวนมา","ru":"кругами","vi":"quay vòng vòng","zht":"團團轉、一圈一圈地"},0,"ch2-r"],["누리다",{"en":"to enjoy","zh":"享受、享有","th":"ได้รับ/เสวยสุข","ru":"наслаждаться","vi":"hưởng thụ, được hưởng","zht":"享受、享有"},1,"ch3-v"],["어쨌든",{"en":"anyway","zh":"总之、不管怎样","th":"ยังไงก็ตาม, อย่างไรก็ดี","ru":"как бы то ни было","vi":"dù sao thì, dù thế nào đi nữa","zht":"總之、不管怎樣"},0,"ch3-v"],["복직하다",{"en":"to return to work","zh":"复职、回去上班","th":"กลับเข้าทำงาน, คืนตำแหน่ง","ru":"вернуться на работу","vi":"quay lại làm việc, phục chức","zht":"復職、回去上班"},1,"ch3-v"],["떠넘기다",{"en":"to shift / pass off onto someone","zh":"推给别人、转嫁","th":"โยนภาระให้คนอื่น","ru":"перекладывать на другого","vi":"đẩy trách nhiệm cho người khác","zht":"推給別人、轉嫁"},1,"ch3-v"],["효도",{"en":"filial piety","zh":"孝道、孝顺","th":"ความกตัญญูต่อพ่อแม่","ru":"почтение к родителям","vi":"hiếu thảo, báo hiếu","zht":"孝道、孝順"},0,"ch3-v"],["예민하다",{"en":"to be sensitive","zh":"敏感","th":"อ่อนไหว, ไวต่อความรู้สึก","ru":"быть чувствительным, нервным","vi":"nhạy cảm","zht":"敏感"},1,"ch3-v"],["룰",{"en":"rule","zh":"规则","th":"กฎ","ru":"правило","vi":"luật lệ, quy tắc","zht":"規則"},0,"ch3-v"],["제한",{"en":"limit","zh":"限制","th":"ข้อจำกัด","ru":"ограничение","vi":"giới hạn, hạn chế","zht":"限制"},0,"ch3-v"],["막",{"en":"just","zh":"刚刚","th":"เพิ่ง, ส่งเดช, มั่ว ๆ","ru":"только что","vi":"vừa mới","zht":"剛剛"},1,"ch3-v"],["화상",{"en":"a burn","zh":"烫伤、烧伤","th":"แผลไฟไหม้/น้ำร้อนลวก","ru":"ожог","vi":"vết bỏng","zht":"燙傷、燒傷"},0,"ch3-v"],["순간적",{"en":"momentary","zh":"瞬间的、一时的","th":"ชั่วขณะ, ทันที","ru":"мгновенный","vi":"trong khoảnh khắc, chốc lát","zht":"瞬間的、一時的"},1,"ch3-v"],["기절하다",{"en":"to faint","zh":"昏倒、晕过去","th":"เป็นลม, หมดสติ","ru":"падать в обморок","vi":"ngất xỉu","zht":"昏倒、暈過去"},0,"ch3-v"],["응급실",{"en":"emergency room","zh":"急诊室","th":"ห้องฉุกเฉิน","ru":"приёмный покой","vi":"phòng cấp cứu","zht":"急診室"},0,"ch3-v"],["말대꾸",{"en":"talking back","zh":"顶嘴","th":"การเถียงกลับ, ตอบโต้","ru":"огрызание","vi":"cãi lại, đối đáp lại","zht":"頂嘴"},0,"ch3-v"],["뻘뻘",{"en":"profusely","zh":"大汗淋漓地","th":"เหงื่อโทรมกาย, เหงื่อไหลโซมกาย","ru":"обильно","vi":"đầm đìa","zht":"大汗淋漓地"},0,"ch3-r"],["쑥",{"en":"out all at once","zh":"一下子伸出、猛地探出","th":"โผล่พรวด, ยื่นออกมาทีเดียว","ru":"вдруг, разом","vi":"thò ra đột ngột, đưa phắt ra","zht":"一下子伸出、猛地探出"},0,"ch3-r"],["웅성웅성",{"en":"murmuring","zh":"嗡嗡、窃窃私语","th":"เสียงจอแจ, เสียงซุบซิบอื้ออึง","ru":"гул, шушуканье","vi":"ồn ào, xì xào","zht":"嗡嗡、竊竊私語"},0,"ch3-r"],["쾅",{"en":"bang","zh":"砰","th":"โครม, ปัง","ru":"бах","vi":"rầm","zht":"砰"},0,"ch3-r"],["쿨쿨",{"en":"sound of sleeping soundly","zh":"呼呼","th":"เสียงกรนหลับสนิท","ru":"звук крепкого сна","vi":"khò khò","zht":"呼呼"},0,"ch3-r"],["훌쩍훌쩍",{"en":"sniffling","zh":"抽抽搭搭","th":"สะอึกสะอื้น, สูดน้ำมูกฟุดฟิด","ru":"всхлипывая, шмыгая носом","vi":"sụt sịt, thút thít","zht":"抽抽搭搭"},0,"ch3-r"],["고개",{"en":"hill","zh":"山坡、山岭、山口","th":"เนินเขา, ช่องเขา","ru":"холм","vi":"đèo, con dốc","zht":"山坡、山嶺、山口"},1,"ch3-r"],["머릿수건",{"en":"head towel","zh":"头巾、包头毛巾","th":"ผ้าโพกหัว","ru":"повязка, платок на голову","vi":"khăn trùm đầu","zht":"頭巾、包頭毛巾"},0,"ch3-r"],["문틈",{"en":"crack / gap in a door","zh":"门缝","th":"ช่องว่างตรงประตู, รอยแยกประตู","ru":"щель в двери","vi":"khe cửa","zht":"門縫"},0,"ch3-r"],["바보",{"en":"fool","zh":"傻瓜、笨蛋","th":"คนโง่","ru":"дурак","vi":"đồ ngốc, kẻ khờ","zht":"傻瓜、笨蛋"},0,"ch3-r"],["밧줄",{"en":"rope","zh":"粗绳、绳索","th":"เชือกเส้นใหญ่","ru":"верёвка, канат","vi":"dây thừng","zht":"粗繩、繩索"},0,"ch3-r"],["오누이",{"en":"brother and sister","zh":"兄妹、姐弟","th":"พี่น้องชายหญิง","ru":"брат и сестра","vi":"anh chị em, hai anh em","zht":"兄妹、姐弟"},1,"ch3-r"],["쥐",{"en":"mouse","zh":"老鼠","th":"หนู","ru":"мышь","vi":"chuột","zht":"老鼠"},0,"ch3-r"],["털",{"en":"fur","zh":"毛、体毛","th":"ขน","ru":"шерсть","vi":"lông","zht":"毛、體毛"},0,"ch3-r"],["하느님",{"en":"God","zh":"老天爷、上帝","th":"พระเจ้า","ru":"Бог","vi":"Thượng đế, ông trời","zht":"老天爺、上帝"},0,"ch3-r"],["하늘나라",{"en":"heaven","zh":"天国、天上","th":"สวรรค์","ru":"небеса","vi":"thiên đường, cõi trời","zht":"天國、天上"},0,"ch3-r"],["가리다",{"en":"to cover","zh":"遮住、挡住","th":"บัง, ปิด, กำบัง","ru":"закрывать","vi":"che, chắn","zht":"遮住、擋住"},1,"ch3-r"],["끊어지다",{"en":"to be cut off","zh":"断掉、被切断","th":"ขาด, หลุด","ru":"обрываться","vi":"bị đứt, bị cắt đứt","zht":"斷掉、被切斷"},0,"ch3-r"],["내밀다",{"en":"to stick out","zh":"伸出、探出","th":"ยื่นออกไป, ยื่นเข้าไป","ru":"высовывать","vi":"thò ra, chìa ra","zht":"伸出、探出"},1,"ch3-r"],["들여다보다",{"en":"to peer into","zh":"往里看、窥视","th":"ชะโงกดู, มองเข้าไป","ru":"заглядывать внутрь","vi":"nhìn vào, ngó vào","zht":"往裡看、窺視"},1,"ch3-r"],["비치다",{"en":"to be reflected","zh":"映照、透出、照射","th":"สะท้อน, ส่องแสง","ru":"отражаться","vi":"được phản chiếu, chiếu rọi","zht":"映照、透出、照射"},0,"ch3-r"],["소리치다",{"en":"to shout","zh":"大声喊叫","th":"ตะโกน, ร้องตะโกน","ru":"кричать","vi":"la hét, hét lên","zht":"大聲喊叫"},0,"ch3-r"],["숨다",{"en":"to hide","zh":"躲藏、藏起来","th":"ซ่อนตัว","ru":"прятаться","vi":"trốn, ẩn nấp","zht":"躲藏、藏起來"},0,"ch3-r"],["쉬다",{"en":"to grow hoarse","zh":"嘶哑","th":"เสียงแหบ","ru":"охрипнуть","vi":"khản","zht":"嘶啞"},0,"ch3-r"],["잡아먹다",{"en":"to catch and eat","zh":"抓来吃、吞吃","th":"จับกิน, กลืนกิน","ru":"поймать и съесть","vi":"bắt ăn thịt, nuốt chửng","zht":"抓來吃、吞吃"},0,"ch3-r"],["질리다",{"en":"to be terrified / fed up","zh":"吓坏、受够了、腻烦","th":"หวาดกลัว, เอือมระอา","ru":"ужаснуться","vi":"sợ hãi, ngán, phát chán","zht":"嚇壞、受夠了、膩煩"},0,"ch3-r"],["굵다",{"en":"deep / low","zh":"低沉","th":"ทุ้ม, ใหญ่","ru":"густой, низкий","vi":"trầm, to","zht":"低沉"},0,"ch3-r"],["깊다",{"en":"to be deep","zh":"深","th":"ลึก","ru":"быть глубоким","vi":"sâu","zht":"深"},0,"ch3-r"],["뚝뚝",{"en":"dripping drop by drop","zh":"一滴一滴地、啪啪断开","th":"เป็นหยด ๆ, ติ๋ง ๆ","ru":"капля за каплей","vi":"nhỏ giọt, tong tong","zht":"一滴一滴地、啪啪斷開"},1,"ch3-r"],["빙빙",{"en":"round and round","zh":"团团转、一圈一圈地","th":"วนเวียน, หมุนติ้ว","ru":"кругами","vi":"quay vòng vòng","zht":"團團轉、一圈一圈地"},1,"ch3-r"],["살금살금",{"en":"stealthily","zh":"悄悄地、蹑手蹑脚地","th":"ย่องเงียบ ๆ","ru":"крадучись","vi":"rón rén, lén lút","zht":"悄悄地、躡手躡腳地"},1,"ch3-r"],["어흥",{"en":"roar","zh":"嗷","th":"เสียงคำรามของเสือ","ru":"ррр","vi":"gâu","zht":"嗷"},0,"ch3-r"],["잔뜩",{"en":"fully","zh":"满满地、一大堆、十足","th":"เต็มที่, มากมาย","ru":"полно","vi":"đầy ắp, rất nhiều, hết mức","zht":"滿滿地、一大堆、十足"},1,"ch3-r"],["쿵",{"en":"thud","zh":"咚","th":"ตุบ, โครม","ru":"бух, глухой стук","vi":"uỵch, thịch","zht":"咚"},0,"ch3-r"],["쿵쿵",{"en":"thump-thump","zh":"咚咚","th":"ตึงตัง, ตึก ๆ","ru":"бух-бух","vi":"thình thịch","zht":"咚咚"},0,"ch3-r"],["독 안에 든 쥐",{"en":"'a rat in a jar' — cornered with no escape","zh":"瓮中之鳖、无路可逃","th":"หนูในไห","ru":"«мышь в кувшине» — загнанный в угол","vi":"như chuột trong chum","zht":"甕中之鱉、無路可逃"},0,"ch3-r"],["빙빙 돌다",{"en":"to go round and round","zh":"转圈圈","th":"หมุนวนไปมา, พูดอ้อมค้อม","ru":"ходить кругами","vi":"quay vòng vòng","zht":"轉圈圈"},0,"ch3-r"],["건전지",{"en":"battery","zh":"干电池","th":"ถ่านไฟฉาย","ru":"батарейка","vi":"pin","zht":"乾電池"},1,"ch3-r"],["구멍",{"en":"hole","zh":"洞、孔","th":"รู, หลุม","ru":"дыра","vi":"lỗ, cái lỗ","zht":"洞、孔"},0,"ch3-r"],["눈꺼풀",{"en":"eyelid","zh":"眼皮","th":"เปลือกตา","ru":"веко","vi":"mí mắt","zht":"眼皮"},0,"ch3-r"],["독소",{"en":"toxin","zh":"毒素","th":"สารพิษ","ru":"токсин","vi":"chất độc, độc tố","zht":"毒素"},0,"ch3-r"],["린스",{"en":"rinse","zh":"护发素","th":"ครีมนวดผม","ru":"ополаскиватель, кондиционер","vi":"dầu xả","zht":"護髮素"},0,"ch3-r"],["망치",{"en":"hammer","zh":"锤子","th":"ค้อน","ru":"молоток","vi":"cái búa","zht":"錘子"},0,"ch3-r"],["모기",{"en":"mosquito","zh":"蚊子","th":"ยุง","ru":"комар","vi":"muỗi","zht":"蚊子"},0,"ch3-r"],["무좀",{"en":"athlete's foot","zh":"脚气","th":"น้ำกัดเท้า","ru":"грибок стопы","vi":"bệnh nấm bàn chân","zht":"腳氣"},0,"ch3-r"],["물파스",{"en":"liquid medicated pain ointment","zh":"液体止痛药膏","th":"ยาน้ำทาแก้ปวด","ru":"жидкая обезболивающая мазь","vi":"dầu xoa dạng nước","zht":"液體止痛藥膏"},0,"ch3-r"],["석유",{"en":"petroleum","zh":"石油、煤油","th":"น้ำมันปิโตรเลียม, น้ำมันก๊าด","ru":"нефть","vi":"dầu hỏa, xăng dầu","zht":"石油、煤油"},0,"ch3-r"],["습기",{"en":"humidity","zh":"湿气、潮气","th":"ความชื้น","ru":"влажность","vi":"hơi ẩm, độ ẩm","zht":"溼氣、潮氣"},0,"ch3-r"],["여드름",{"en":"acne","zh":"青春痘、痤疮","th":"สิว","ru":"прыщи","vi":"mụn trứng cá","zht":"青春痘、痤瘡"},0,"ch3-r"],["열",{"en":"fever","zh":"发烧","th":"ไข้, ความร้อน","ru":"температура","vi":"sốt, nhiệt","zht":"發燒"},0,"ch3-r"],["잉크",{"en":"ink","zh":"墨水","th":"หมึก","ru":"чернила","vi":"mực","zht":"墨水"},0,"ch3-r"],["진공청소기",{"en":"vacuum cleaner","zh":"吸尘器","th":"เครื่องดูดฝุ่น","ru":"пылесос","vi":"máy hút bụi","zht":"吸塵器"},0,"ch3-r2"],["탈모",{"en":"hair loss","zh":"脱发","th":"ผมร่วง","ru":"выпадение волос","vi":"rụng tóc","zht":"脫髮"},1,"ch3-r2"],["호두",{"en":"walnut","zh":"核桃","th":"วอลนัท","ru":"грецкий орех","vi":"quả óc chó","zht":"核桃"},0,"ch3-r2"],["구기다",{"en":"to crumple","zh":"揉皱、弄皱","th":"ยับ, ขย้ำ","ru":"мять","vi":"làm nhàu, vò nhăn","zht":"揉皺、弄皺"},0,"ch3-r2"],["달래다",{"en":"to soothe","zh":"哄、安抚","th":"ปลอบ, เกลี้ยกล่อม","ru":"успокаивать","vi":"dỗ dành, xoa dịu","zht":"哄、安撫"},0,"ch3-r2"],["묻다",{"en":"gets smeared / stained on","zh":"沾上、染上","th":"เปื้อน, ติด","ru":"пачкаться","vi":"dính, bám vào","zht":"沾上、染上"},1,"ch3-r2"],["물리다",{"en":"to be bitten","zh":"被咬、被叮","th":"ถูกกัด","ru":"быть укушенным","vi":"bị cắn","zht":"被咬、被叮"},0,"ch3-r2"],["변형되다",{"en":"to be deformed","zh":"变形","th":"เปลี่ยนรูป, ผิดรูป","ru":"деформироваться","vi":"bị biến dạng, biến đổi","zht":"變形"},0,"ch3-r2"],["사라지다",{"en":"disappears","zh":"消失","th":"หายไป","ru":"исчезать","vi":"biến mất","zht":"消失"},1,"ch3-r2"],["없애다",{"en":"to get rid of","zh":"消除、去掉","th":"กำจัด, ทำให้หมดไป","ru":"избавляться","vi":"loại bỏ, xóa bỏ","zht":"消除、去掉"},0,"ch3-r2"],["제거하다",{"en":"to remove","zh":"清除、去除","th":"ขจัดออก, ลบออก","ru":"удалять","vi":"loại bỏ, tẩy trừ","zht":"清除、去除"},1,"ch3-r2"],["지우다",{"en":"to erase","zh":"擦掉、抹去","th":"ลบ","ru":"стирать","vi":"xóa, tẩy","zht":"擦掉、抹去"},0,"ch3-r2"],["헹구다",{"en":"to rinse","zh":"漂洗、冲洗","th":"ล้าง, ชะล้าง","ru":"ополаскивать","vi":"xả, tráng","zht":"漂洗、沖洗"},1,"ch3-r2"],["가렵다",{"en":"to be itchy","zh":"痒","th":"คัน","ru":"чесаться","vi":"ngứa","zht":"癢"},1,"ch3-r2"],["덜하다",{"en":"to be less","zh":"减轻、缓解、差一些","th":"น้อยลง, เบาลง","ru":"быть менее","vi":"ít hơn, nhẹ hơn, giảm bớt","zht":"減輕、緩解、差一些"},0,"ch3-r2"],["뚝",{"en":"abruptly","zh":"突然、啪嗒","th":"ผัวะ, ฉับพลัน","ru":"резко","vi":"đột ngột","zht":"突然、啪嗒"},0,"ch3-r2"],["서너",{"en":"three or four","zh":"三四个、三四","th":"สามสี่","ru":"три-четыре","vi":"ba bốn","zht":"三四個、三四"},0,"ch3-r2"],["남극",{"en":"the South Pole","zh":"南极","th":"ขั้วโลกใต้, แอนตาร์กติก","ru":"Южный полюс","vi":"Nam Cực","zht":"南極"},0,"ch3-r2"],["북극",{"en":"the North Pole","zh":"北极","th":"ขั้วโลกเหนือ, อาร์กติก","ru":"Северный полюс","vi":"Bắc Cực","zht":"北極"},0,"ch3-r2"],["사막",{"en":"desert","zh":"沙漠","th":"ทะเลทราย","ru":"пустыня","vi":"sa mạc","zht":"沙漠"},0,"ch3-r2"],["적도",{"en":"the equator","zh":"赤道","th":"เส้นศูนย์สูตร","ru":"экватор","vi":"xích đạo","zht":"赤道"},0,"ch3-r2"],["태평양",{"en":"the Pacific Ocean","zh":"太平洋","th":"มหาสมุทรแปซิฟิก","ru":"Тихий океан","vi":"Thái Bình Dương","zht":"太平洋"},0,"ch3-r2"],["가뭄",{"en":"drought","zh":"干旱","th":"ภัยแล้ง","ru":"засуха","vi":"hạn hán","zht":"乾旱"},0,"ch3-r2"],["자외선",{"en":"ultraviolet rays","zh":"紫外线","th":"รังสีอัลตราไวโอเลต","ru":"ультрафиолет","vi":"tia cực tím","zht":"紫外線"},0,"ch3-r2"],["해일",{"en":"tidal wave","zh":"海啸","th":"คลื่นยักษ์, สึนามิ","ru":"цунами","vi":"sóng thần","zht":"海嘯"},0,"ch3-r2"],["홍수",{"en":"flood","zh":"洪水","th":"น้ำท่วม","ru":"наводнение","vi":"lũ lụt","zht":"洪水"},0,"ch3-r2"],["황사",{"en":"yellow dust","zh":"沙尘暴","th":"ฝุ่นเหลือง","ru":"жёлтая пыль","vi":"bụi vàng","zht":"沙塵暴"},0,"ch3-r2"],["거미",{"en":"spider","zh":"蜘蛛","th":"แมงมุม","ru":"паук","vi":"con nhện","zht":"蜘蛛"},0,"ch3-r2"],["매미",{"en":"cicada","zh":"知了、蝉","th":"จักจั่น","ru":"цикада","vi":"ve sầu","zht":"知了、蟬"},0,"ch3-r2"],["바퀴벌레",{"en":"cockroach","zh":"蟑螂","th":"แมลงสาบ","ru":"таракан","vi":"con gián","zht":"蟑螂"},0,"ch3-r2"],["잠자리",{"en":"dragonfly","zh":"蜻蜓","th":"แมลงปอ","ru":"стрекоза","vi":"chuồn chuồn","zht":"蜻蜓"},0,"ch3-r2"],["파리",{"en":"fly","zh":"苍蝇","th":"แมลงวัน","ru":"муха","vi":"con ruồi","zht":"蒼蠅"},0,"ch3-r2"],["공룡",{"en":"dinosaur","zh":"恐龙","th":"ไดโนเสาร์","ru":"динозавр","vi":"khủng long","zht":"恐龍"},0,"ch3-r2"],["기린",{"en":"giraffe","zh":"长颈鹿","th":"ยีราฟ","ru":"жираф","vi":"hươu cao cổ","zht":"長頸鹿"},0,"ch3-r2"],["코끼리",{"en":"elephant","zh":"大象","th":"ช้าง","ru":"слон","vi":"con voi","zht":"大象"},0,"ch3-r2"],["펭귄",{"en":"penguin","zh":"企鹅","th":"เพนกวิน","ru":"пингвин","vi":"chim cánh cụt","zht":"企鵝"},0,"ch3-r2"],["수컷 / 암컷",{"en":"male / female","zh":"雄性／雌性","th":"ตัวผู้ / ตัวเมีย","ru":"самец / самка","vi":"con đực / con cái","zht":"雄性／雌性"},0,"ch3-r2"],["미각",{"en":"taste","zh":"味觉","th":"การรับรส","ru":"вкус","vi":"vị giác","zht":"味覺"},0,"ch3-r2"],["시각",{"en":"sight","zh":"视觉","th":"การมองเห็น, สายตา","ru":"зрение","vi":"thị giác","zht":"視覺"},0,"ch3-r2"],["청각",{"en":"hearing","zh":"听觉","th":"การได้ยิน","ru":"слух","vi":"thính giác","zht":"聽覺"},0,"ch3-r2"],["촉각",{"en":"touch","zh":"触觉","th":"การสัมผัส","ru":"осязание","vi":"xúc giác","zht":"觸覺"},0,"ch3-r2"],["후각",{"en":"smell","zh":"嗅觉","th":"การได้กลิ่น","ru":"обоняние","vi":"khứu giác","zht":"嗅覺"},0,"ch3-r2"],["여드름",{"en":"pimple","zh":"青春痘、痤疮","th":"สิว","ru":"прыщи","vi":"mụn trứng cá","zht":"青春痘、痤瘡"},0,"ch3-r2"],["잠꼬대",{"en":"sleep-talking","zh":"梦话","th":"การละเมอพูด","ru":"разговоры во сне","vi":"nói mớ","zht":"夢話"},0,"ch3-r2"],["재채기",{"en":"sneeze","zh":"喷嚏","th":"การจาม","ru":"чихание","vi":"hắt hơi","zht":"噴嚏"},0,"ch3-r2"],["트림",{"en":"burp","zh":"打嗝","th":"การเรอ","ru":"отрыжка","vi":"ợ hơi","zht":"打嗝"},0,"ch3-r2"],["하품",{"en":"yawn","zh":"哈欠","th":"การหาว","ru":"зевота","vi":"ngáp","zht":"哈欠"},0,"ch3-r2"],["기억력",{"en":"memory","zh":"记忆力","th":"ความจำ","ru":"память","vi":"trí nhớ","zht":"記憶力"},1,"ch3-r2"],["뇌",{"en":"brain","zh":"大脑","th":"สมอง","ru":"мозг","vi":"não","zht":"大腦"},1,"ch3-r2"],["우뇌",{"en":"the right brain","zh":"右脑","th":"สมองซีกขวา","ru":"правое полушарие мозга","vi":"não phải","zht":"右腦"},0,"ch3-r2"],["좌뇌",{"en":"the left brain","zh":"左脑","th":"สมองซีกซ้าย","ru":"левое полушарие мозга","vi":"não trái","zht":"左腦"},0,"ch3-r2"],["모국어",{"en":"mother tongue","zh":"母语","th":"ภาษาแม่","ru":"родной язык","vi":"tiếng mẹ đẻ","zht":"母語"},0,"ch3-r2"],["발달",{"en":"development","zh":"发展、发达","th":"การพัฒนา, ความเจริญ","ru":"развитие","vi":"sự phát triển","zht":"發展、發達"},0,"ch3-r2"],["변화",{"en":"change","zh":"变化","th":"การเปลี่ยนแปลง","ru":"изменение","vi":"sự thay đổi","zht":"變化"},0,"ch3-r2"],["스트레칭",{"en":"stretching","zh":"拉伸、伸展运动","th":"การยืดเส้นยืดสาย","ru":"растяжка","vi":"vận động giãn cơ, kéo giãn","zht":"拉伸、伸展運動"},0,"ch3-r2"],["양손",{"en":"both hands","zh":"双手","th":"ทั้งสองมือ","ru":"обе руки","vi":"hai tay","zht":"雙手"},0,"ch3-r2"],["역할",{"en":"role","zh":"作用、角色","th":"บทบาท, หน้าที่","ru":"роль","vi":"vai trò","zht":"作用、角色"},0,"ch3-r2"],["영향",{"en":"influence","zh":"影响","th":"อิทธิพล, ผลกระทบ","ru":"влияние","vi":"ảnh hưởng","zht":"影響"},1,"ch3-r2"],["오감",{"en":"the five senses","zh":"五感、五官感觉","th":"ประสาทสัมผัสทั้งห้า","ru":"пять чувств","vi":"ngũ giác","zht":"五感、五官感覺"},0,"ch3-r2"],["자극",{"en":"stimulus","zh":"刺激","th":"สิ่งกระตุ้น, การกระตุ้น","ru":"стимул","vi":"sự kích thích","zht":"刺激"},1,"ch3-r2"],["증진",{"en":"promotion","zh":"促进、增进","th":"การส่งเสริม, การเพิ่มพูน","ru":"укрепление","vi":"sự thúc đẩy, tăng cường","zht":"促進、增進"},0,"ch3-r2"],["창의적",{"en":"creative","zh":"有创意的、创造性的","th":"สร้างสรรค์, คิดสร้างสรรค์","ru":"творческий","vi":"mang tính sáng tạo","zht":"有創意的、創造性的"},0,"ch3-r2"],["호기심",{"en":"curiosity","zh":"好奇心","th":"ความอยากรู้อยากเห็น","ru":"любопытство","vi":"tính tò mò","zht":"好奇心"},1,"ch3-r2"],["뜻하다",{"en":"to mean","zh":"意味着、意思是","th":"หมายถึง, มีความหมายว่า","ru":"означать","vi":"có nghĩa là, ngụ ý","zht":"意味著、意思是"},0,"ch3-r2"],["박히다",{"en":"to be embedded","zh":"嵌入、扎进、根深蒂固","th":"ฝังอยู่, ติดแน่น","ru":"быть вбитым, застрявшим","vi":"bị găm vào, ăn sâu","zht":"嵌入、扎進、根深蒂固"},0,"ch3-r2"],["벗어나다",{"en":"to escape","zh":"摆脱、脱离","th":"หลุดพ้นจาก, หนีออกจาก","ru":"вырваться","vi":"thoát khỏi, vượt ra khỏi","zht":"擺脫、脫離"},0,"ch3-r2"],["자극하다",{"en":"to stimulate","zh":"刺激、激发","th":"กระตุ้น","ru":"стимулировать","vi":"kích thích","zht":"刺激、激發"},0,"ch3-r2"],["좌우하다",{"en":"to influence","zh":"左右、支配、决定","th":"ชี้ขาด, มีอิทธิพลเหนือ, ควบคุม","ru":"определять","vi":"chi phối, quyết định","zht":"左右、支配、決定"},0,"ch3-r2"],["어리석다",{"en":"to be foolish","zh":"愚蠢、糊涂","th":"โง่เขลา","ru":"быть глупым","vi":"ngu ngốc, dại dột","zht":"愚蠢、糊塗"},0,"ch3-r2"],["지혜롭다",{"en":"to be wise","zh":"明智、有智慧","th":"ฉลาดรอบรู้, มีปัญญา","ru":"быть мудрым","vi":"khôn ngoan, thông thái","zht":"明智、有智慧"},0,"ch3-r2"],["침착하다",{"en":"to be calm","zh":"沉着、冷静","th":"ใจเย็น, สงบนิ่ง","ru":"быть спокойным, собранным","vi":"điềm tĩnh, bình tĩnh","zht":"沉著、冷靜"},1,"ch3-r2"],["결코",{"en":"never","zh":"绝不、决","th":"ไม่...เด็ดขาด, ไม่มีทาง","ru":"никогда","vi":"tuyệt đối không, không bao giờ","zht":"絕不、決"},0,"ch3-r2"],["조회 수",{"en":"view count","zh":"浏览量、点击量","th":"จำนวนผู้ชม/ยอดวิว","ru":"число просмотров","vi":"lượt xem","zht":"瀏覽量、點選量"},0,"ch4-v"],["반응",{"en":"reaction","zh":"反应、反响","th":"ปฏิกิริยา, การตอบสนอง","ru":"реакция","vi":"phản ứng, phản hồi","zht":"反應、反響"},1,"ch4-v"],["입상",{"en":"winning a prize","zh":"获奖、入围获奖","th":"การได้รับรางวัล, ติดอันดับ","ru":"призовое место","vi":"đạt giải, vào chung kết","zht":"獲獎、入圍獲獎"},1,"ch4-v"],["내팽개치다",{"en":"to fling away","zh":"扔下不管、丢弃、抛开","th":"ทิ้งขว้าง, ปล่อยปละละเลย","ru":"забросить","vi":"vứt bỏ, bỏ mặc, bỏ bê","zht":"扔下不管、丟棄、拋開"},0,"ch4-v"],["노름하다",{"en":"to gamble","zh":"赌博","th":"เล่นพนัน","ru":"играть в азартные игры","vi":"đánh bạc","zht":"賭博"},0,"ch4-v"],["어르신",{"en":"elder","zh":"老人家、长辈","th":"ผู้อาวุโส, ท่านผู้สูงอายุ","ru":"уважаемый старший","vi":"bậc trưởng bối, người lớn tuổi","zht":"老人家、長輩"},0,"ch4-v"],["조신하다",{"en":"to be demure","zh":"端庄、文静、谨慎","th":"สงบเสงี่ยม, เรียบร้อย","ru":"быть скромной, благопристойной","vi":"nết na, đoan trang, thận trọng","zht":"端莊、文靜、謹慎"},0,"ch4-v"],["여사(님)",{"en":"madam","zh":"夫人、女士","th":"คุณนาย, ท่านผู้หญิง","ru":"госпожа","vi":"bà, phu nhân","zht":"夫人、女士"},0,"ch4-v"],["성함",{"en":"name","zh":"姓名","th":"ชื่อ","ru":"имя","vi":"quý danh, tên","zht":"姓名"},0,"ch4-v"],["부문",{"en":"sector","zh":"部门、类别、项目","th":"ประเภท, สาขา, ฝ่าย","ru":"раздел","vi":"bộ phận, hạng mục","zht":"部門、類別、專案"},0,"ch4-v"],["출전하다",{"en":"to compete / take part","zh":"参赛、出场","th":"เข้าร่วมแข่งขัน, ลงสนาม","ru":"участвовать в соревновании","vi":"tham gia thi đấu","zht":"參賽、出場"},1,"ch4-v"],["며늘아기",{"en":"daughter-in-law","zh":"儿媳妇","th":"ลูกสะใภ้ที่รัก","ru":"невестка","vi":"con dâu yêu quý","zht":"兒媳婦"},0,"ch4-v"],["소원성취하다",{"en":"to fulfill / achieve one's wish","zh":"如愿以偿、心愿达成","th":"สมความปรารถนา, สมหวัง","ru":"исполнить желание","vi":"đạt được điều ước","zht":"如願以償、心願達成"},0,"ch4-v"],["지경",{"en":"a state / point","zh":"地步、境地","th":"ขั้น, ถึงขนาด, ถึงจุดที่","ru":"состояние","vi":"tình trạng, mức độ","zht":"地步、境地"},0,"ch4-v"],["고혈압",{"en":"high blood pressure","zh":"高血压","th":"ความดันโลหิตสูง","ru":"гипертония","vi":"huyết áp cao","zht":"高血壓"},0,"ch4-v"],["건사하다",{"en":"to look after","zh":"照料、料理、维持","th":"ดูแลรักษา, ประคับประคอง","ru":"присматривать","vi":"chăm lo, trông nom, giữ gìn","zht":"照料、料理、維持"},1,"ch4-v"],["내기",{"en":"a bet","zh":"打赌、赌注","th":"การพนันขันต่อ, เดิมพัน","ru":"пари","vi":"cá cược, đánh cược","zht":"打賭、賭注"},0,"ch4-v"],["비기다",{"en":"to tie","zh":"打平、平局","th":"เสมอ","ru":"сыграть вничью","vi":"hòa","zht":"打平、平局"},1,"ch4-v"],["집안이 시끄럽다",{"en":"the household is in turmoil","zh":"家里吵吵闹闹、家宅不宁","th":"ในบ้านวุ่นวาย","ru":"в доме шум и неразбериха","vi":"nhà cửa ồn ào","zht":"家裡吵吵鬧鬧、家宅不寧"},1,"ch4-v"],["(의) 여신",{"en":"goddess","zh":"……女神","th":"เทพธิดาแห่ง","ru":"богиня","vi":"nữ thần của","zht":"……女神"},0,"ch4-v"],["총대를 메다",{"en":"to take one for the team","zh":"出头担责、替大家扛起责任","th":"รับหน้าที่แทนทุกคน","ru":"взять на себя тяжёлую обязанность за всех","vi":"đứng ra gánh vác thay cả nhóm","zht":"出頭擔責、替大家扛起責任"},1,"ch4-v"],["손(을) 쓰다",{"en":"to take measures","zh":"采取措施、想办法处理","th":"หาทางแก้ไข, จัดการ","ru":"принять меры","vi":"ra tay, tìm cách xử lý","zht":"採取措施、想辦法處理"},1,"ch4-v"],["걱정이 태산이다",{"en":"to be worried sick","zh":"愁得要命、忧心忡忡","th":"กังวลใจอย่างมาก","ru":"ужасно беспокоиться","vi":"lo lắng chất đống như núi","zht":"愁得要命、憂心忡忡"},1,"ch4-v"],["여한이 없다",{"en":"to have no regrets","zh":"毫无遗憾、了无牵挂","th":"ไม่มีอะไรให้เสียดาย, สมใจแล้ว","ru":"не о чем жалеть","vi":"không còn gì hối tiếc","zht":"毫無遺憾、了無牽掛"},1,"ch4-v"],["보자 보자 하니까",{"en":"'since I keep letting it slide…'","zh":"我一再忍让、你却……","th":"ฉันอดทนมามากแล้วนะ","ru":"«сколько можно терпеть...» — моё терпение лопн…","vi":"tôi nhịn mãi rồi đấy","zht":"我一再忍讓、你卻……"},1,"ch4-v"],["개성",{"en":"individuality","zh":"个性","th":"ความเป็นตัวของตัวเอง","ru":"индивидуальность","vi":"cá tính","zht":"個性"},1,"ch4-r"],["경북",{"en":"Gyeongbuk","zh":"庆北","th":"จังหวัดคย็องบุก","ru":"Кёнбук","vi":"Gyeongbuk","zht":"慶北"},0,"ch4-r"],["경상남도",{"en":"South Gyeongsang Province","zh":"庆尚南道","th":"จังหวัดคย็องซังนัมโด","ru":"провинция Южная Кёнсан","vi":"tỉnh Nam Gyeongsang","zht":"慶尚南道"},0,"ch4-r"],["남성",{"en":"male","zh":"男性","th":"เพศชาย, ผู้ชาย","ru":"мужчина","vi":"nam giới","zht":"男性"},1,"ch4-r"],["대구",{"en":"Daegu","zh":"大邱","th":"แทกู","ru":"Тэгу","vi":"Daegu","zht":"大邱"},0,"ch4-r"],["만세",{"en":"hurrah","zh":"万岁","th":"ทรงพระเจริญ, ชัยโย","ru":"да здравствует","vi":"vạn tuế","zht":"萬歲"},0,"ch4-r"],["만세 삼창",{"en":"three cheers of 'manse'","zh":"三呼万岁","th":"การร้อง \"มันเซ\" สามครั้ง","ru":"троекратное «мансе»","vi":"hô vạn tuế ba lần","zht":"三呼萬歲"},0,"ch4-r"],["삼세판",{"en":"best of three","zh":"三局两胜","th":"แพ้ชนะสามตา","ru":"до трёх раундов","vi":"ba ván, chơi ba hiệp","zht":"三局兩勝"},0,"ch4-r"],["시민",{"en":"citizen","zh":"市民","th":"ประชาชน, พลเมือง","ru":"граждане","vi":"thị dân, người dân","zht":"市民"},0,"ch4-r"],["여론",{"en":"public opinion","zh":"舆论","th":"ความคิดเห็นของสาธารณชน","ru":"общественное мнение","vi":"dư luận","zht":"輿論"},0,"ch4-r"],["연령층",{"en":"age group","zh":"年龄层","th":"ช่วงอายุ, กลุ่มอายุ","ru":"возрастная группа","vi":"nhóm tuổi, lứa tuổi","zht":"年齡層"},0,"ch4-r"],["음주",{"en":"drinking","zh":"饮酒","th":"การดื่มแอลกอฮอล์","ru":"употребление алкоголя","vi":"uống rượu","zht":"飲酒"},0,"ch4-r"],["인구",{"en":"population","zh":"人口","th":"ประชากร","ru":"население","vi":"dân số","zht":"人口"},1,"ch4-r"],["전라남도",{"en":"South Jeolla Province","zh":"全罗南道","th":"จังหวัดช็อลลานัมโด","ru":"провинция Южная Чолла","vi":"tỉnh Nam Jeolla","zht":"全羅南道"},0,"ch4-r"],["전라북도",{"en":"North Jeolla Province","zh":"全罗北道","th":"จังหวัดช็อลลาบุกโด","ru":"провинция Северная Чолла","vi":"tỉnh Bắc Jeolla","zht":"全羅北道"},0,"ch4-r"],["-에 걸치다",{"en":"to span","zh":"横跨、涉及、持续","th":"ครอบคลุม, ทอดยาวตลอด","ru":"охватывать","vi":"trải dài, kéo dài qua","zht":"橫跨、涉及、持續"},1,"ch4-r"],["대표하다",{"en":"to represent","zh":"代表","th":"เป็นตัวแทน","ru":"представлять","vi":"đại diện","zht":"代表"},0,"ch4-r"],["응답하다",{"en":"to respond","zh":"回应、回答","th":"ตอบ, ตอบรับ","ru":"отвечать","vi":"trả lời, hồi đáp","zht":"回應、回答"},1,"ch4-r"],["차지하다",{"en":"to occupy","zh":"占据、占","th":"ครอบครอง, คิดเป็นสัดส่วน","ru":"занимать","vi":"chiếm","zht":"佔據、佔"},1,"ch4-r"],["뚜렷하다",{"en":"to be clear","zh":"清晰、明显","th":"ชัดเจน, เด่นชัด","ru":"быть ясным, чётким, отчётливым","vi":"rõ ràng, rõ rệt","zht":"清晰、明顯"},1,"ch4-r"],["참으로",{"en":"truly","zh":"真正地、确实","th":"จริง ๆ, อย่างแท้จริง","ru":"поистине","vi":"thật sự, quả thật","zht":"真正地、確實"},0,"ch4-r"],["어쩔 수 없다",{"en":"there's no choice","zh":"没办法、无可奈何","th":"ไม่มีทางเลือก, ช่วยไม่ได้","ru":"ничего не поделаешь","vi":"không còn cách nào khác","zht":"沒辦法、無可奈何"},1,"ch4-r"],["틀에 박히다",{"en":"to be stereotyped","zh":"千篇一律、墨守成规","th":"ซ้ำซากจำเจ, เป็นแบบเดิมตายตัว","ru":"быть шаблонным, закостенелым","vi":"rập khuôn, theo khuôn mẫu","zht":"千篇一律、墨守成規"},1,"ch4-r"],["경조사",{"en":"family occasions","zh":"红白喜事","th":"งานมงคลและอวมงคล","ru":"семейные торжества и траур","vi":"việc hiếu hỷ","zht":"紅白喜事"},0,"ch4-r"],["경조사비",{"en":"money given for family occasions","zh":"红白喜事礼金","th":"เงินใส่ซองงานแต่ง/งานศพ","ru":"деньги на свадьбы и похороны","vi":"tiền mừng/phúng hiếu hỷ","zht":"紅白喜事禮金"},0,"ch4-r"],["노부부",{"en":"an elderly couple","zh":"老夫妇","th":"คู่สามีภรรยาสูงอายุ","ru":"пожилая пара","vi":"cặp vợ chồng già","zht":"老夫婦"},0,"ch4-r"],["대접",{"en":"treatment","zh":"款待、招待、待遇","th":"การต้อนรับ, การปฏิบัติต่อ","ru":"приём","vi":"sự đãi ngộ, tiếp đãi","zht":"款待、招待、待遇"},0,"ch4-r"],["미움",{"en":"hatred","zh":"憎恨、讨厌","th":"ความเกลียดชัง","ru":"ненависть","vi":"sự ghét bỏ","zht":"憎恨、討厭"},0,"ch4-r"],["부도",{"en":"bankruptcy","zh":"倒闭、跳票","th":"การล้มละลาย, เช็คเด้ง","ru":"банкротство","vi":"vỡ nợ, phá sản","zht":"倒閉、跳票"},0,"ch4-r"],["상갓집",{"en":"a house of mourning","zh":"丧家、办丧事的人家","th":"บ้านที่มีงานศพ","ru":"дом, где проходят поминки","vi":"nhà tang lễ, nhà có tang","zht":"喪家、辦喪事的人家"},0,"ch4-r"],["상대적",{"en":"relative","zh":"相对的","th":"เปรียบเทียบ, สัมพัทธ์","ru":"относительный","vi":"tương đối","zht":"相對的"},0,"ch4-r"],["순간적",{"en":"momentary","zh":"瞬间的、一时的","th":"ชั่วขณะ, ฉับพลัน","ru":"мгновенный","vi":"trong khoảnh khắc, tức thời","zht":"瞬間的、一時的"},0,"ch4-r"],["시어머니",{"en":"mother-in-law","zh":"婆婆","th":"แม่สามี","ru":"свекровь","vi":"mẹ chồng","zht":"婆婆"},0,"ch4-r"],["식",{"en":"way","zh":"方式、样子","th":"แบบ, วิธี","ru":"манера, способ","vi":"kiểu, cách","zht":"方式、樣子"},0,"ch4-r"],["기타 의견 말하기",{"en":"stating other / miscellaneous opinions","zh":"说明其他意见","th":"การบอกความเห็นอื่น ๆ","ru":"упоминание прочих мнений","vi":"nêu các ý kiến khác","zht":"說明其他意見"},0,"ch4-r"],["실적",{"en":"performance","zh":"业绩、成绩","th":"ผลงาน, ยอดขาย","ru":"результаты","vi":"thành tích, kết quả kinh doanh","zht":"業績、成績"},0,"ch4-r2"],["애정",{"en":"affection","zh":"爱情、感情、深情","th":"ความรักใคร่, ความผูกพัน","ru":"привязанность","vi":"tình cảm, sự yêu thương","zht":"愛情、感情、深情"},0,"ch4-r2"],["약점",{"en":"weak point","zh":"弱点","th":"จุดอ่อน","ru":"слабое место","vi":"điểm yếu","zht":"弱點"},0,"ch4-r2"],["연봉",{"en":"annual salary","zh":"年薪","th":"เงินเดือนรายปี","ru":"годовая зарплата","vi":"lương năm","zht":"年薪"},0,"ch4-r2"],["영업",{"en":"sales","zh":"销售、营业","th":"การขาย, งานธุรกิจ","ru":"продажи","vi":"kinh doanh, bán hàng","zht":"銷售、營業"},0,"ch4-r2"],["일방적",{"en":"one-sided","zh":"单方面的","th":"ฝ่ายเดียว, ข้างเดียว","ru":"односторонний","vi":"một chiều, đơn phương","zht":"單方面的"},0,"ch4-r2"],["정 (情)",{"en":"affection","zh":"情、感情","th":"ความผูกพัน, ความรักใคร่","ru":"чон","vi":"tình cảm gắn bó","zht":"情、感情"},0,"ch4-r2"],["정서",{"en":"emotion","zh":"情绪、情感","th":"อารมณ์ความรู้สึก","ru":"эмоции","vi":"cảm xúc, tình cảm","zht":"情緒、情感"},0,"ch4-r2"],["친근감",{"en":"a sense of familiarity / closeness","zh":"亲近感","th":"ความรู้สึกคุ้นเคย/สนิทสนม","ru":"чувство близости","vi":"cảm giác thân thuộc, gần gũi","zht":"親近感"},0,"ch4-r2"],["판매",{"en":"selling","zh":"销售、贩卖","th":"การขาย","ru":"продажа","vi":"bán hàng, doanh số","zht":"銷售、販賣"},1,"ch4-r2"],["고마워하다",{"en":"to feel grateful","zh":"感谢、心怀感激","th":"รู้สึกขอบคุณ","ru":"быть благодарным","vi":"biết ơn, cảm ơn","zht":"感謝、心懷感激"},0,"ch4-r2"],["더불다",{"en":"to be together with","zh":"一起、同……在一起","th":"อยู่ด้วยกัน, ร่วมกับ","ru":"быть вместе с","vi":"cùng với, đi kèm","zht":"一起、同……在一起"},0,"ch4-r2"],["들다",{"en":"to enter","zh":"进入","th":"เข้าไป","ru":"входить","vi":"vào, bước vào","zht":"進入"},0,"ch4-r2"],["반하다",{"en":"to fall for","zh":"迷上、爱上、倾倒","th":"หลงรัก, ตกหลุมรัก, ติดใจ","ru":"влюбиться","vi":"phải lòng, mê đắm","zht":"迷上、愛上、傾倒"},0,"ch4-r2"],["빠지다",{"en":"to fall into","zh":"陷入、沉迷","th":"ตกลงไป, จมอยู่ใน, หลงใหล","ru":"впасть, погрузиться","vi":"rơi vào, chìm vào","zht":"陷入、沉迷"},0,"ch4-r2"],["살펴보다",{"en":"to look into","zh":"仔细查看、观察","th":"พิจารณา, สำรวจดู","ru":"присмотреться","vi":"xem xét, quan sát kỹ","zht":"仔細檢視、觀察"},0,"ch4-r2"],["설명되다",{"en":"to be explained","zh":"被说明、得到解释","th":"ถูกอธิบาย","ru":"быть объяснённым","vi":"được giải thích","zht":"被說明、得到解釋"},0,"ch4-r2"],["쌓다",{"en":"to pile up","zh":"堆积、累积、建立","th":"สะสม, กอง, ก่อ","ru":"накапливать","vi":"chất đống, tích lũy, xây dựng","zht":"堆積、累積、建立"},0,"ch4-r2"],["유지되다",{"en":"to be maintained","zh":"被维持、得以保持","th":"ถูกรักษาไว้, คงอยู่","ru":"сохраняться","vi":"được duy trì","zht":"被維持、得以保持"},0,"ch4-r2"],["이루어지다",{"en":"to be achieved","zh":"实现、达成","th":"สำเร็จ, เกิดขึ้น, ประกอบด้วย","ru":"осуществляться","vi":"được tạo thành, được thực hiện","zht":"實現、達成"},1,"ch4-r2"],["정의되다",{"en":"to be defined","zh":"被定义","th":"ถูกนิยาม","ru":"быть определённым","vi":"được định nghĩa","zht":"被定義"},1,"ch4-r2"],["챙기다",{"en":"to take care of","zh":"照顾、操心、收拾带上","th":"ดูแล, เอาใจใส่, เตรียม/จัดของ","ru":"заботиться","vi":"chăm sóc, lo toan, thu xếp","zht":"照顧、操心、收拾帶上"},0,"ch4-r2"],["밉다",{"en":"to be hateful","zh":"讨厌、可恨","th":"น่าเกลียดชัง, ไม่น่ารัก","ru":"быть противным, ненавистным","vi":"đáng ghét","zht":"討厭、可恨"},1,"ch4-r2"],["질기다",{"en":"to be tough","zh":"有韧性、咬不动","th":"เหนียว, ทนทาน","ru":"быть жёстким, жилистым","vi":"dai, bền","zht":"有韌性、咬不動"},0,"ch4-r2"],["허전하다",{"en":"to feel empty","zh":"空虚、空落落、孤单","th":"รู้สึกว่างเปล่า, เหงา, โหวง ๆ","ru":"чувствовать пустоту","vi":"trống vắng, hụt hẫng, cô đơn","zht":"空虛、空落落、孤單"},1,"ch4-r2"],["단순히",{"en":"simply","zh":"单纯地、仅仅","th":"เพียงแค่, เพียงเท่านั้น","ru":"просто","vi":"đơn giản chỉ là","zht":"單純地、僅僅"},1,"ch4-r2"],["서서히",{"en":"gradually","zh":"渐渐地、慢慢地","th":"ค่อย ๆ, ทีละน้อย","ru":"постепенно","vi":"dần dần, từ từ","zht":"漸漸地、慢慢地"},1,"ch4-r2"],["과언이 아니다",{"en":"it is no exaggeration","zh":"说……并不为过","th":"พูดไม่เกินจริง","ru":"не будет преувеличением","vi":"nói không ngoa","zht":"說……並不為過"},0,"ch4-r2"],["첫눈에 반하다",{"en":"to fall in love at first sight","zh":"一见钟情","th":"รักแรกพบ","ru":"влюбиться с первого взгляда","vi":"phải lòng ngay từ cái nhìn đầu tiên","zht":"一見鍾情"},0,"ch4-r2"],["정을 쌓다",{"en":"to build up affection / a bond","zh":"积累感情、培养情谊","th":"สร้างความผูกพัน","ru":"выстраивать привязанность","vi":"vun đắp tình cảm","zht":"積累感情、培養情誼"},0,"ch4-r2"],["정이 들다",{"en":"to grow attached","zh":"产生感情、日久生情","th":"เกิดความผูกพัน","ru":"привязаться","vi":"nảy sinh tình cảm, gắn bó","zht":"產生感情、日久生情"},1,"ch4-r2"],["허기지다",{"en":"to be famished","zh":"饥肠辘辘、饿极了","th":"หิวโซ, หิวจนไม่มีแรง","ru":"быть голодным, изголодавшимся","vi":"đói lả, đói meo","zht":"飢腸轆轆、餓極了"},1,"ch5-v"],["현지",{"en":"the local area","zh":"当地、现场","th":"ท้องถิ่น, สถานที่จริง","ru":"на месте","vi":"tại chỗ, địa phương","zht":"當地、現場"},0,"ch5-v"],["극기 훈련",{"en":"endurance training","zh":"意志力训练、磨炼训练","th":"การฝึกความอดทน","ru":"тренировка силы воли и выносливости","vi":"huấn luyện chịu đựng khắc kỷ","zht":"意志力訓練、磨鍊訓練"},0,"ch5-v"],["한겨울",{"en":"midwinter","zh":"隆冬","th":"กลางฤดูหนาว","ru":"разгар зимы","vi":"giữa mùa đông, đông giá","zht":"隆冬"},0,"ch5-v"],["떼",{"en":"flock","zh":"群、一群","th":"ฝูง","ru":"стая","vi":"bầy, đàn","zht":"群、一群"},0,"ch5-v"],["휭휭",{"en":"whoosh","zh":"呼呼","th":"วู้ ๆ","ru":"свист, завывание","vi":"vù vù","zht":"呼呼"},0,"ch5-v"],["쫓다",{"en":"to chase","zh":"追赶、驱赶","th":"ไล่ตาม, ไล่ไป","ru":"гнаться","vi":"đuổi, rượt","zht":"追趕、驅趕"},0,"ch5-v"],["강제",{"en":"force","zh":"强制","th":"การบังคับ","ru":"принуждение","vi":"sự cưỡng ép","zht":"強制"},0,"ch5-v"],["이주",{"en":"migration","zh":"迁移、移居","th":"การย้ายถิ่นฐาน","ru":"переселение","vi":"di cư, chuyển đi nơi khác","zht":"遷移、移居"},0,"ch5-v"],["초췌하다",{"en":"haggard","zh":"憔悴","th":"ซูบซีด, อิดโรย","ru":"измождённый, осунувшийся","vi":"tiều tụy, hốc hác","zht":"憔悴"},1,"ch5-v"],["탁",{"en":"with a sudden pop","zh":"啪地一下、突然","th":"ผัวะ, ฉับพลัน","ru":"с лёгким хлопком","vi":"bật ra, phụt ra bất ngờ","zht":"啪地一下、突然"},0,"ch5-v"],["관광청",{"en":"tourism office","zh":"旅游局","th":"สำนักงานการท่องเที่ยว","ru":"управление по туризму","vi":"cơ quan du lịch","zht":"旅遊局"},0,"ch5-v"],["장기 여행",{"en":"long-term trip","zh":"长期旅行","th":"การท่องเที่ยวระยะยาว","ru":"длительное путешествие","vi":"chuyến du lịch dài ngày","zht":"長期旅行"},0,"ch5-v"],["훑다",{"en":"to skim","zh":"扫视、浏览、掠过","th":"กวาดตามอง, ไล่ดูผ่าน ๆ","ru":"пробежать глазами","vi":"lướt qua, đọc lướt","zht":"掃視、瀏覽、掠過"},1,"ch5-v"],["넓히다",{"en":"to broaden","zh":"拓宽、扩大","th":"ขยาย, ทำให้กว้างขึ้น","ru":"расширять","vi":"mở rộng, nới rộng","zht":"拓寬、擴大"},1,"ch5-v"],["예리하다",{"en":"sharp","zh":"敏锐、锐利","th":"แหลมคม, เฉียบแหลม","ru":"быть острым, проницательным","vi":"sắc bén, tinh tường","zht":"敏銳、銳利"},1,"ch5-v"],["의외로",{"en":"unexpectedly","zh":"出乎意料地","th":"โดยไม่คาดคิด","ru":"неожиданно","vi":"bất ngờ, ngoài dự đoán","zht":"出乎意料地"},1,"ch5-v"],["공간감",{"en":"sense of space","zh":"空间感","th":"ความรู้สึกต่อพื้นที่/มิติ","ru":"чувство пространства","vi":"cảm giác về không gian","zht":"空間感"},0,"ch5-v"],["닳다",{"en":"to wear out","zh":"磨损、磨破","th":"สึกหรอ, ลบเลือน","ru":"стираться","vi":"mòn, mòn đi","zht":"磨損、磨破"},0,"ch5-v"],["재현",{"en":"reenactment","zh":"再现、重现","th":"การจำลองใหม่, การสร้างซ้ำ","ru":"воссоздание","vi":"sự tái hiện, tái dựng","zht":"再現、重現"},0,"ch5-v"],["쬐다",{"en":"to bask in","zh":"晒、烤","th":"ผิงแดด, ตากแดด","ru":"греться","vi":"phơi mình, hong","zht":"曬、烤"},1,"ch5-v"],["조그맣다",{"en":"tiny","zh":"小小的、小巧","th":"เล็กจิ๋ว, เล็กน้อย","ru":"крошечный, маленький","vi":"bé xíu, nhỏ nhắn","zht":"小小的、小巧"},0,"ch5-v"],["부엉이",{"en":"owl","zh":"猫头鹰","th":"นกฮูก","ru":"филин, сова","vi":"con cú mèo","zht":"貓頭鷹"},0,"ch5-v"],["파드닥거리다",{"en":"to flutter","zh":"扑棱、扑腾","th":"กระพือปีก, กระพือ","ru":"трепыхаться","vi":"vỗ cánh phành phạch","zht":"撲稜、撲騰"},0,"ch5-v"],["강렬하다",{"en":"intense","zh":"强烈","th":"รุนแรง, เข้มข้น, ทรงพลัง","ru":"быть сильным, интенсивным","vi":"mạnh mẽ, mãnh liệt, ấn tượng","zht":"強烈"},1,"ch5-v"],["말이 -(이)지",{"en":"'it's called X, but really…'","zh":"说是……、其实……","th":"ว่ากันว่า...แต่จริง ๆ แล้ว","ru":"«говорится-то X","vi":"nói là... nhưng thực ra","zht":"說是……、其實……"},1,"ch5-v"],["객관적",{"en":"objective","zh":"客观的","th":"เป็นกลาง, เชิงวัตถุวิสัย","ru":"объективный","vi":"khách quan","zht":"客觀的"},1,"ch5-r"],["검사",{"en":"test","zh":"检查、测试","th":"การทดสอบ, การตรวจ","ru":"проверка","vi":"kiểm tra, xét nghiệm","zht":"檢查、測試"},0,"ch5-r"],["기준",{"en":"standard","zh":"标准","th":"มาตรฐาน, เกณฑ์","ru":"стандарт","vi":"tiêu chuẩn","zht":"標準"},1,"ch5-r"],["별자리",{"en":"constellation","zh":"星座","th":"กลุ่มดาว, ราศี","ru":"созвездие","vi":"chòm sao, cung hoàng đạo","zht":"星座"},0,"ch5-r"],["분석적",{"en":"analytical","zh":"分析型的、善于分析","th":"เชิงวิเคราะห์","ru":"аналитический","vi":"mang tính phân tích","zht":"分析型的、善於分析"},1,"ch5-r"],["사물",{"en":"object","zh":"事物、物体","th":"วัตถุ, สิ่งของ","ru":"предмет","vi":"sự vật, đồ vật","zht":"事物、物體"},1,"ch5-r"],["에너지",{"en":"energy","zh":"能量","th":"พลังงาน","ru":"энергия","vi":"năng lượng","zht":"能量"},1,"ch5-r"],["외부",{"en":"outside","zh":"外部","th":"ภายนอก","ru":"внешний","vi":"bên ngoài","zht":"外部"},1,"ch5-r"],["이론",{"en":"theory","zh":"理论","th":"ทฤษฎี","ru":"теория","vi":"lý thuyết","zht":"理論"},0,"ch5-r"],["현실적",{"en":"realistic","zh":"现实的、务实的","th":"สมจริง, ตามความเป็นจริง","ru":"реалистичный","vi":"thực tế, mang tính hiện thực","zht":"現實的、務實的"},1,"ch5-r"],["혈액형",{"en":"blood type","zh":"血型","th":"หมู่เลือด","ru":"группа крови","vi":"nhóm máu","zht":"血型"},0,"ch5-r"],["효율적",{"en":"efficient","zh":"高效的","th":"มีประสิทธิภาพ","ru":"эффективный","vi":"hiệu quả, có hiệu suất","zht":"高效的"},1,"ch5-r"],["맺다",{"en":"to form","zh":"建立、结成","th":"สร้าง, ผูก","ru":"завязывать","vi":"kết, tạo lập","zht":"建立、結成"},1,"ch5-r"],["파악하다",{"en":"to grasp","zh":"掌握、弄清、把握","th":"เข้าใจ, จับประเด็น","ru":"понять","vi":"nắm bắt, hiểu rõ","zht":"掌握、弄清、把握"},1,"ch5-r"],["흔들리다",{"en":"to be shaken","zh":"摇晃、动摇","th":"สั่นคลอน, โยกเยก","ru":"колебаться","vi":"bị lung lay, dao động","zht":"搖晃、動搖"},0,"ch5-r"],["신중하다",{"en":"careful","zh":"慎重、谨慎","th":"รอบคอบ, ระมัดระวัง","ru":"быть осторожным","vi":"thận trọng","zht":"慎重、謹慎"},1,"ch5-r"],["겸손하다",{"en":"humble","zh":"谦虚","th":"ถ่อมตัว, สุภาพถ่อมตน","ru":"быть скромным","vi":"khiêm tốn","zht":"謙虛"},1,"ch5-r"],["까다롭다",{"en":"picky","zh":"挑剔、难伺候、复杂","th":"จู้จี้จุกจิก, เลือกมาก","ru":"быть придирчивым","vi":"khó tính, kén chọn","zht":"挑剔、難伺候、複雜"},1,"ch5-r"],["꼼꼼하다",{"en":"meticulous","zh":"细致、一丝不苟","th":"ละเอียดรอบคอบ","ru":"быть дотошным, аккуратным","vi":"tỉ mỉ, cẩn thận","zht":"細緻、一絲不苟"},1,"ch5-r"],["단순하다",{"en":"simple-minded","zh":"单纯、头脑简单","th":"เรียบง่าย, ซื่อ ๆ, ไม่ซับซ้อน","ru":"быть простодушным, простым","vi":"đơn giản, suy nghĩ đơn thuần","zht":"單純、頭腦簡單"},1,"ch5-r"],["털털하다",{"en":"easygoing","zh":"随和、大大咧咧","th":"สบาย ๆ, ใจกว้าง, ไม่ถือสา","ru":"быть непринуждённым","vi":"xuề xòa, dễ tính, thoải mái","zht":"隨和、大大咧咧"},1,"ch5-r"],["보수적이다",{"en":"conservative","zh":"保守","th":"อนุรักษ์นิยม","ru":"быть консервативным","vi":"bảo thủ","zht":"保守"},1,"ch5-r"],["변덕스럽다",{"en":"fickle","zh":"善变、反复无常","th":"เปลี่ยนใจง่าย, อารมณ์แปรปรวน","ru":"быть переменчивым, капризным","vi":"thất thường, hay thay đổi","zht":"善變、反覆無常"},1,"ch5-r"],["시원시원하다",{"en":"refreshingly frank","zh":"爽快、痛快","th":"ตรงไปตรงมา, โปร่งใจ, เปิดเผย","ru":"быть прямым и открытым, бодрым","vi":"thẳng thắn, sảng khoái","zht":"爽快、痛快"},1,"ch5-r"],["싫증을 잘 내다",{"en":"to get bored easily","zh":"容易厌倦、三分钟热度","th":"เบื่อง่าย","ru":"быстро надоедать","vi":"dễ chán","zht":"容易厭倦、三分鐘熱度"},1,"ch5-r"],["예술 감각이 있다",{"en":"to have an artistic sense","zh":"有艺术细胞、有艺术感","th":"มีความรู้สึกทางศิลปะ","ru":"обладать художественным чутьём","vi":"có khiếu nghệ thuật","zht":"有藝術細胞、有藝術感"},1,"ch5-r"],["융통성이 있다",{"en":"to be flexible","zh":"灵活变通","th":"ยืดหยุ่น, รู้จักปรับตัว","ru":"быть гибким","vi":"linh hoạt, biết biến thông","zht":"靈活變通"},1,"ch5-r"],["이기적이다",{"en":"selfish","zh":"自私","th":"เห็นแก่ตัว","ru":"быть эгоистичным","vi":"ích kỷ","zht":"自私"},1,"ch5-r"],["이성적이다",{"en":"rational","zh":"理性","th":"มีเหตุผล","ru":"быть рациональным","vi":"lý trí","zht":"理性"},1,"ch5-r"],["직선적이다",{"en":"blunt","zh":"直来直去、直率","th":"พูดตรง ๆ, ตรงไปตรงมา","ru":"быть прямолинейным","vi":"thẳng thừng, thẳng tính","zht":"直來直去、直率"},1,"ch5-r"],["차분하다",{"en":"calm","zh":"沉静、安稳、从容","th":"สงบ, เยือกเย็น, ใจเย็น","ru":"быть спокойным, сдержанным","vi":"điềm đạm, nhẹ nhàng","zht":"沉靜、安穩、從容"},1,"ch5-r"],["나름",{"en":"one's own way","zh":"自有一套、各自的方式","th":"ตามแบบของตัวเอง, แล้วแต่","ru":"по-своему","vi":"cách riêng, theo kiểu của mình","zht":"自有一套、各自的方式"},1,"ch5-r"],["방해",{"en":"disturbance","zh":"妨碍、打扰","th":"การขัดขวาง, การรบกวน","ru":"помеха","vi":"sự cản trở, quấy rầy","zht":"妨礙、打擾"},0,"ch5-r"],["서류함",{"en":"document cabinet","zh":"文件柜","th":"ตู้เก็บเอกสาร","ru":"шкаф для документов","vi":"tủ đựng tài liệu","zht":"檔案櫃"},0,"ch5-r"],["소용",{"en":"use","zh":"用处、作用","th":"ประโยชน์, ผลที่ได้","ru":"польза","vi":"tác dụng, ích lợi","zht":"用處、作用"},0,"ch5-r"],["아이디어",{"en":"idea","zh":"主意、点子","th":"ไอเดีย, ความคิด","ru":"идея","vi":"ý tưởng","zht":"主意、點子"},0,"ch5-r"],["이상적",{"en":"ideal","zh":"理想的","th":"ในอุดมคติ","ru":"идеальный","vi":"lý tưởng","zht":"理想的"},0,"ch5-r"],["조직적",{"en":"organized","zh":"有组织的、有条理的","th":"เป็นระบบ, มีการจัดระเบียบ","ru":"организованный","vi":"có tổ chức, có hệ thống","zht":"有組織的、有條理的"},1,"ch5-r"],["책장",{"en":"bookshelf","zh":"书架","th":"ชั้นหนังสือ","ru":"книжная полка","vi":"giá sách, kệ sách","zht":"書架"},0,"ch5-r"],["결재하다",{"en":"to approve","zh":"批准、审批","th":"อนุมัติ","ru":"утверждать, визировать","vi":"phê duyệt","zht":"批准、審批"},0,"ch5-r"],["대처하다",{"en":"to cope with","zh":"应对、处理","th":"รับมือ, จัดการกับ","ru":"справляться","vi":"đối phó, xử lý","zht":"應對、處理"},0,"ch5-r"],["비다",{"en":"to be empty","zh":"空、空着","th":"ว่างเปล่า, ว่าง","ru":"быть пустым","vi":"trống, rỗng","zht":"空、空著"},0,"ch5-r"],["여기다",{"en":"to consider","zh":"认为、看作","th":"คิดว่า, ถือว่า, มองว่า","ru":"считать","vi":"xem như, coi là","zht":"認為、看作"},1,"ch5-r"],["재충전하다",{"en":"to recharge","zh":"充电、恢复精力","th":"ชาร์จพลังใหม่","ru":"перезарядиться","vi":"nạp lại năng lượng","zht":"充電、恢復精力"},0,"ch5-r"],["처리하다",{"en":"to handle","zh":"处理、办理","th":"จัดการ, ดำเนินการ","ru":"обрабатывать","vi":"xử lý, giải quyết","zht":"處理、辦理"},1,"ch5-r"],["틀어박히다",{"en":"to hole up","zh":"窝在家里、闷在里面不出门","th":"ขังตัวเอง","ru":"запереться","vi":"ru rú ở trong","zht":"窩在家裡、悶在裡面不出門"},0,"ch5-r"],["해내다",{"en":"to pull off","zh":"做成、完成、搞定","th":"ทำสำเร็จ, ฝ่าฝันทำจนได้","ru":"справиться","vi":"làm được, hoàn thành","zht":"做成、完成、搞定"},0,"ch5-r"],["허비하다",{"en":"to waste","zh":"浪费","th":"ใช้เวลาอย่างสิ้นเปลือง","ru":"тратить впустую","vi":"lãng phí","zht":"浪費"},0,"ch5-r"],["흩어 놓다",{"en":"to scatter about","zh":"散乱地放、摊开乱放","th":"วางกระจัดกระจาย","ru":"разбрасывать","vi":"vứt rải rác, bày bừa","zht":"散亂地放、攤開亂放"},1,"ch5-r"],["깔끔하다",{"en":"neat","zh":"整洁、干净利落","th":"เรียบร้อย, สะอาดตา","ru":"быть опрятным, аккуратным","vi":"gọn gàng, sạch sẽ","zht":"整潔、乾淨利落"},1,"ch5-r"],["어지럽다",{"en":"dizzy","zh":"头晕","th":"เวียนหัว","ru":"кружиться","vi":"chóng mặt","zht":"頭暈"},1,"ch5-r"],["도무지",{"en":"not at all","zh":"怎么也、根本","th":"ไม่...เลยสักนิด, ไม่เข้าใจเลย","ru":"совсем не","vi":"hoàn toàn không, chẳng thể nào","zht":"怎麼也、根本"},1,"ch5-r"],["모처럼",{"en":"after a long while","zh":"难得、好不容易","th":"นาน ๆ ที, หลังจากนานมา","ru":"после долгого перерыва","vi":"lâu lắm mới, hiếm hoi mới","zht":"難得、好不容易"},1,"ch5-r"],["절레절레",{"en":"shaking one's head","zh":"连连摇头","th":"ส่ายหน้าปฏิเสธ","ru":"качая головой","vi":"lắc đầu nguầy nguậy","zht":"連連搖頭"},0,"ch5-r"],["철저히",{"en":"thoroughly","zh":"彻底地","th":"อย่างละเอียดถี่ถ้วน","ru":"тщательно","vi":"một cách kỹ lưỡng, triệt để","zht":"徹底地"},1,"ch5-r"],["녹초가 되다",{"en":"to be wiped out","zh":"累瘫、筋疲力尽","th":"หมดแรง, เหนื่อยจนหมดสภาพ","ru":"выбиться из сил","vi":"kiệt sức, mệt rã rời","zht":"累癱、筋疲力盡"},1,"ch5-r"],["소귀에 경 읽기",{"en":"preaching to deaf ears","zh":"对牛弹琴","th":"เทศน์ให้หูหนวกฟัง","ru":"читать сутру в ухо корове — метать бисер перед…","vi":"đàn gảy tai trâu","zht":"對牛彈琴"},1,"ch5-r"],["직책",{"en":"position","zh":"职务、职位","th":"ตำแหน่งหน้าที่","ru":"должность","vi":"chức vụ","zht":"職務、職位"},0,"ch6-v"],["정시 퇴근",{"en":"leaving work on time","zh":"准时下班","th":"เลิกงานตรงเวลา","ru":"уход с работы вовремя","vi":"tan làm đúng giờ","zht":"準時下班"},1,"ch6-v"],["인형 탈",{"en":"mascot costume","zh":"玩偶服、吉祥物头套","th":"ชุดมาสคอต","ru":"костюм-маскот","vi":"bộ đồ mascot","zht":"玩偶服、吉祥物頭套"},0,"ch6-v"],["관리직",{"en":"managerial position","zh":"管理岗位","th":"ตำแหน่งผู้บริหาร","ru":"руководящая должность","vi":"vị trí quản lý","zht":"管理崗位"},0,"ch6-v"],["흔히",{"en":"commonly","zh":"常常、通常","th":"โดยทั่วไป, มักจะ","ru":"обычно","vi":"thường, hay","zht":"常常、通常"},1,"ch6-v"],["워라밸",{"en":"work-life balance","zh":"工作与生活的平衡","th":"สมดุลชีวิตกับการทำงาน","ru":"баланс работы и личной жизни","vi":"cân bằng giữa công việc và cuộc sống","zht":"工作與生活的平衡"},0,"ch6-v"],["와닿다",{"en":"to hit home","zh":"有共鸣、说到心坎里","th":"ถึงใจ, รู้สึกเข้าใจจริง ๆ","ru":"попасть в самую точку","vi":"chạm đến trái tim, thấm thía","zht":"有共鳴、說到心坎裡"},1,"ch6-v"],["반하다",{"en":"to fall for","zh":"迷上、倾倒","th":"หลงรัก, ติดใจ","ru":"влюбиться","vi":"phải lòng, mê","zht":"迷上、傾倒"},1,"ch6-v"],["본업",{"en":"one's main job","zh":"本职工作、主业","th":"งานหลัก","ru":"основная работа","vi":"nghề chính","zht":"本職工作、主業"},0,"ch6-v"],["충실하다",{"en":"faithful","zh":"尽职、踏实、忠实","th":"ซื่อสัตย์ทุ่มเท","ru":"быть добросовестным, преданным","vi":"trung thành, chu đáo, tận tụy","zht":"盡職、踏實、忠實"},1,"ch6-v"],["벅차다",{"en":"overwhelming","zh":"吃力、承受不了、激动满怀","th":"หนักเกินไป, เกินกำลัง, ท่วมท้น","ru":"быть непосильным","vi":"quá sức, nặng nề","zht":"吃力、承受不了、激動滿懷"},1,"ch6-v"],["주인 의식",{"en":"sense of ownership","zh":"主人翁意识","th":"ความรู้สึกเป็นเจ้าของ","ru":"чувство хозяина","vi":"tinh thần làm chủ","zht":"主人翁意識"},0,"ch6-v"],["고통",{"en":"pain","zh":"痛苦、疼痛","th":"ความเจ็บปวด, ความทุกข์ทรมาน","ru":"боль","vi":"nỗi đau, sự khổ sở","zht":"痛苦、疼痛"},0,"ch6-v"],["사업상",{"en":"for business","zh":"出于业务原因、因生意关系","th":"เรื่องธุรกิจ, ด้านการงาน","ru":"по деловым причинам","vi":"vì công việc kinh doanh","zht":"出於業務原因、因生意關係"},0,"ch6-v"],["끈끈하다",{"en":"tight-knit","zh":"紧密、亲密","th":"แน่นแฟ้น, เหนียวแน่น","ru":"быть сплочённым","vi":"gắn bó chặt chẽ","zht":"緊密、親密"},0,"ch6-v"],["지나치다",{"en":"excessive","zh":"过分、过度","th":"มากเกินไป, เกินพอดี","ru":"чрезмерный","vi":"quá mức","zht":"過分、過度"},1,"ch6-v"],["우정",{"en":"friendship","zh":"友情","th":"มิตรภาพ","ru":"дружба","vi":"tình bạn","zht":"友情"},0,"ch6-v"],["강요받다",{"en":"to be pressured into","zh":"被迫、被强迫","th":"ถูกบังคับ, ถูกกดดัน","ru":"подвергаться принуждению","vi":"bị ép buộc","zht":"被迫、被強迫"},0,"ch6-v"],["괜한 소리를 하다",{"en":"to say something needless","zh":"说多余的话","th":"พูดเรื่องไม่จำเป็น","ru":"сказать лишнее","vi":"nói điều thừa thãi, nói vô ích","zht":"說多餘的話"},1,"ch6-v"],["죽은 듯이 있다",{"en":"to keep dead quiet","zh":"一声不吭、屏声静气","th":"เงียบกริบ, อยู่นิ่ง ๆ","ru":"сидеть тихо как мышь","vi":"im thin thít, im như chết","zht":"一聲不吭、屏聲靜氣"},1,"ch6-v"],["말을 아끼다",{"en":"to hold one's tongue","zh":"惜言、少说话","th":"ไม่พูดมาก, เก็บคำพูด","ru":"беречь слова","vi":"giữ lời, kiệm lời","zht":"惜言、少說話"},1,"ch6-v"],["혀를 내두르다",{"en":"to be amazed","zh":"咋舌、惊叹不已","th":"ทึ่งจนพูดไม่ออก, ส่ายหน้าทึ่ง","ru":"поражаться","vi":"kinh ngạc đến líu lưỡi","zht":"咋舌、驚歎不已"},1,"ch6-v"],["밸런스를 맞추다",{"en":"to strike a balance","zh":"保持平衡","th":"รักษาสมดุล","ru":"соблюдать баланс","vi":"giữ cân bằng","zht":"保持平衡"},0,"ch6-v"],["기에 눌리다",{"en":"to be overpowered by someone's presence","zh":"被气势压倒","th":"ถูกข่มด้วยบารมี/ออร่าของอีกฝ่าย","ru":"быть подавленным чьим-то авторитетом","vi":"bị áp đảo bởi khí thế của ai đó","zht":"被氣勢壓倒"},1,"ch6-v"],["가사",{"en":"housework","zh":"家务","th":"งานบ้าน","ru":"домашние дела","vi":"việc nhà","zht":"家務"},0,"ch6-r"],["고령",{"en":"old age","zh":"高龄","th":"วัยชรา, สูงอายุ","ru":"пожилой возраст","vi":"tuổi cao, người cao tuổi","zht":"高齡"},1,"ch6-r"],["공교육",{"en":"public education","zh":"公共教育","th":"การศึกษาของรัฐ","ru":"государственное образование","vi":"giáo dục công lập","zht":"公共教育"},0,"ch6-r"],["경기",{"en":"economy","zh":"经济景气、市面行情","th":"เศรษฐกิจ, ภาวะธุรกิจ","ru":"экономическая конъюнктура","vi":"tình hình kinh tế, thị trường","zht":"經濟景氣、市面行情"},0,"ch6-r"],["기혼",{"en":"married","zh":"已婚","th":"แต่งงานแล้ว","ru":"состоящий в браке","vi":"đã kết hôn","zht":"已婚"},0,"ch6-r"],["대책",{"en":"countermeasure","zh":"对策","th":"มาตรการรับมือ","ru":"меры","vi":"biện pháp đối phó, đối sách","zht":"對策"},1,"ch6-r"],["보육",{"en":"childcare","zh":"保育、托育","th":"การเลี้ยงดูเด็ก","ru":"уход за маленькими детьми","vi":"chăm sóc và nuôi dạy trẻ nhỏ","zht":"保育、托育"},0,"ch6-r"],["사교육",{"en":"private education","zh":"课外补习","th":"การศึกษาเอกชน, เรียนพิเศษ","ru":"частное образование","vi":"giáo dục tư","zht":"課外補習"},1,"ch6-r"],["사상",{"en":"in history","zh":"史上、有史以来","th":"ในประวัติศาสตร์","ru":"за всю историю","vi":"trong lịch sử","zht":"史上、有史以來"},1,"ch6-r"],["성인",{"en":"adult","zh":"成年人","th":"ผู้ใหญ่","ru":"взрослый","vi":"người trưởng thành","zht":"成年人"},0,"ch6-r"],["애",{"en":"kid","zh":"孩子、小孩","th":"เด็ก, ลูก","ru":"ребёнок","vi":"đứa bé, trẻ con","zht":"孩子、小孩"},0,"ch6-r"],["양립",{"en":"having both","zh":"兼顾、并存","th":"การทำสองอย่างได้พร้อมกัน","ru":"совмещение","vi":"sự song hành, dung hòa cả hai","zht":"兼顧、並存"},0,"ch6-r"],["육아",{"en":"child-rearing","zh":"育儿","th":"การเลี้ยงลูก","ru":"воспитание детей","vi":"nuôi con","zht":"育兒"},1,"ch6-r"],["정부",{"en":"government","zh":"政府","th":"รัฐบาล","ru":"правительство","vi":"chính phủ","zht":"政府"},0,"ch6-r"],["조기 유학",{"en":"early study abroad","zh":"早期留学","th":"การไปเรียนต่างประเทศตั้งแต่เด็ก","ru":"ранняя учёба за границей","vi":"du học sớm","zht":"早期留學"},1,"ch6-r"],["지난해",{"en":"last year","zh":"去年","th":"ปีที่แล้ว","ru":"прошлый год","vi":"năm ngoái","zht":"去年"},0,"ch6-r"],["출산",{"en":"childbirth","zh":"生育、分娩","th":"การคลอดบุตร","ru":"роды","vi":"sinh đẻ","zht":"生育、分娩"},1,"ch6-r"],["통계",{"en":"statistics","zh":"统计","th":"สถิติ","ru":"статистика","vi":"thống kê","zht":"統計"},0,"ch6-r"],["평균",{"en":"average","zh":"平均","th":"ค่าเฉลี่ย","ru":"среднее значение","vi":"trung bình","zht":"平均"},0,"ch6-r"],["허용",{"en":"permission","zh":"允许、准许","th":"การอนุญาต","ru":"разрешение","vi":"cho phép","zht":"允許、准許"},0,"ch6-r"],["그치다",{"en":"to stop","zh":"停止","th":"หยุดอยู่ที่, จบแค่","ru":"прекращаться","vi":"dừng lại, chỉ dừng ở mức","zht":"停止"},0,"ch6-r"],["꼽다",{"en":"to pick","zh":"选出、数得上、位居前列","th":"ยกเป็นอันดับต้น, นับ, ชี้ว่า","ru":"выделять, называть","vi":"chọn ra, đếm","zht":"選出、數得上、位居前列"},1,"ch6-r"],["기록하다",{"en":"to record","zh":"记录","th":"บันทึก","ru":"записывать","vi":"ghi lại, ghi nhận","zht":"記錄"},0,"ch6-r"],["답하다",{"en":"to answer","zh":"回答","th":"ตอบ","ru":"отвечать","vi":"trả lời","zht":"回答"},0,"ch6-r"],["실시하다",{"en":"to carry out","zh":"实施、进行","th":"ดำเนินการ, จัดทำ","ru":"проводить","vi":"thực hiện, tiến hành","zht":"實施、進行"},0,"ch6-r"],["증가하다",{"en":"to increase","zh":"增加","th":"เพิ่มขึ้น","ru":"увеличиваться","vi":"tăng lên","zht":"增加"},1,"ch6-r"],["진입하다",{"en":"to enter","zh":"进入","th":"เข้าสู่","ru":"вступать","vi":"bước vào, tiến vào","zht":"進入"},0,"ch6-r"],["시급하다",{"en":"urgent","zh":"紧迫、刻不容缓","th":"เร่งด่วน","ru":"быть неотложным, срочным","vi":"cấp bách","zht":"緊迫、刻不容緩"},0,"ch6-r"],["급격히",{"en":"rapidly","zh":"急剧地","th":"อย่างรวดเร็ว, อย่างฮวบฮาบ","ru":"стремительно","vi":"một cách nhanh chóng, đột ngột","zht":"急劇地"},0,"ch6-r"],["초",{"en":"super-","zh":"超……","th":"ซุปเปอร์-, สุด ๆ","ru":"супер-, сверх-","vi":"siêu","zht":"超……"},0,"ch6-r"],["오랜",{"en":"long-standing","zh":"长久的、由来已久的","th":"เก่าแก่, นาน","ru":"давний","vi":"lâu đời, kéo dài lâu","zht":"長久的、由來已久的"},0,"ch6-r"],["초·중·고교생",{"en":"elementary/middle/high schoolers","zh":"中小学生","th":"นักเรียนประถม มัธยมต้น มัธยมปลาย","ru":"учащиеся начальной","vi":"học sinh tiểu học","zht":"中小學生"},0,"ch6-r"],["-(으)므로",{"en":"since","zh":"因为、由于","th":"เพราะ..., ดังนั้น","ru":"так как","vi":"vì, do","zht":"因為、由於"},1,"ch6-r"],["과외",{"en":"private tutoring","zh":"课外辅导、家教","th":"การติวพิเศษ, เรียนพิเศษ","ru":"репетиторство","vi":"dạy kèm, gia sư","zht":"課外輔導、家教"},1,"ch6-r"],["거부",{"en":"refusal","zh":"拒绝","th":"การปฏิเสธ","ru":"отказ","vi":"sự từ chối, phản đối","zht":"拒絕"},0,"ch6-r"],["교육열",{"en":"education fever","zh":"教育热","th":"ความกระตือรือร้นด้านการศึกษา","ru":"«лихорадка образования»","vi":"cơn sốt giáo dục","zht":"教育熱"},0,"ch6-r"],["구조",{"en":"structure","zh":"结构","th":"โครงสร้าง","ru":"структура","vi":"cấu trúc, cơ cấu","zht":"結構"},0,"ch6-r"],["국가적",{"en":"national","zh":"国家层面的","th":"ระดับชาติ","ru":"общегосударственный","vi":"mang tính quốc gia","zht":"國家層面的"},0,"ch6-r"],["국내",{"en":"domestic","zh":"国内","th":"ในประเทศ","ru":"внутри страны","vi":"trong nước","zht":"國內"},0,"ch6-r"],["기러기아빠",{"en":"'goose dad'","zh":"大雁爸爸","th":"\"พ่อห่านป่า\"","ru":"«папа-гусь»","vi":"\"bố chim ngỗng\"","zht":"大雁爸爸"},1,"ch6-r"],["낭비",{"en":"waste","zh":"浪费","th":"ความสิ้นเปลือง","ru":"расточительство","vi":"lãng phí","zht":"浪費"},1,"ch6-r"],["맹모삼천지교",{"en":"Mencius' mother moved three times","zh":"孟母三迁","th":"แม่ของเมิ่งจื่อย้ายบ้านสามครั้ง","ru":"мать Мэнцзы трижды переезжала","vi":"mẹ Mạnh Tử dọn nhà ba lần","zht":"孟母三遷"},0,"ch6-r"],["문제점",{"en":"problem","zh":"问题点","th":"ปัญหา, ข้อบกพร่อง","ru":"проблемный момент","vi":"điểm có vấn đề, vấn đề","zht":"問題點"},0,"ch6-r"],["비용",{"en":"cost","zh":"费用","th":"ค่าใช้จ่าย","ru":"расходы","vi":"chi phí","zht":"費用"},1,"ch6-r"],["어학연수",{"en":"language study abroad","zh":"语言进修","th":"การไปเรียนภาษาต่างประเทศ","ru":"языковая стажировка за границей","vi":"du học ngôn ngữ","zht":"語言進修"},0,"ch6-r"],["언론",{"en":"the press","zh":"媒体、舆论界","th":"สื่อมวลชน","ru":"пресса","vi":"báo chí, truyền thông","zht":"媒體、輿論界"},0,"ch6-r"],["열의",{"en":"enthusiasm","zh":"热忱、热情","th":"ความกระตือรือร้น, ความตั้งใจ","ru":"рвение","vi":"nhiệt huyết, sự nhiệt tình","zht":"熱忱、熱情"},0,"ch6-r"],["위주",{"en":"centered on","zh":"以……为主","th":"มุ่งเน้นที่..., เป็นศูนย์กลาง","ru":"ориентированный на","vi":"lấy... làm trọng tâm","zht":"以……為主"},0,"ch6-r"],["이익",{"en":"profit","zh":"利益、好处","th":"กำไร, ผลประโยชน์","ru":"прибыль","vi":"lợi ích, lợi nhuận","zht":"利益、好處"},0,"ch6-r"],["자식",{"en":"one's children","zh":"子女","th":"ลูก ๆ","ru":"дети","vi":"con cái","zht":"子女"},0,"ch6-r"],["적응력",{"en":"adaptability","zh":"适应能力","th":"ความสามารถในการปรับตัว","ru":"способность адаптироваться","vi":"khả năng thích nghi","zht":"適應能力"},0,"ch6-r"],["제도",{"en":"system","zh":"制度","th":"ระบบ","ru":"система","vi":"chế độ, hệ thống","zht":"制度"},1,"ch6-r"],["정상화",{"en":"normalization","zh":"正常化","th":"การทำให้กลับสู่ภาวะปกติ","ru":"нормализация","vi":"bình thường hóa","zht":"正常化"},0,"ch6-r"],["차원",{"en":"level","zh":"层面、层次","th":"ระดับ, มิติ","ru":"уровень","vi":"cấp độ, tầm mức","zht":"層面、層次"},0,"ch6-r"],["해결책",{"en":"solution","zh":"解决办法","th":"วิธีแก้ปัญหา","ru":"решение","vi":"giải pháp","zht":"解決辦法"},0,"ch6-r"],["마련하다",{"en":"to arrange","zh":"准备、筹措、想出","th":"จัดเตรียม, หามาให้","ru":"подготовить","vi":"chuẩn bị, tìm ra, xoay xở","zht":"準備、籌措、想出"},0,"ch6-r"],["받아들이다",{"en":"to accept","zh":"接受、采纳","th":"ยอมรับ, รับไว้","ru":"принимать","vi":"chấp nhận, tiếp nhận","zht":"接受、採納"},0,"ch6-r"],["보도되다",{"en":"to be reported","zh":"被报道","th":"ถูกรายงานข่าว","ru":"сообщаться","vi":"được đưa tin","zht":"被報道"},0,"ch6-r"],["습득하다",{"en":"to acquire","zh":"掌握、习得","th":"ได้มา, เรียนรู้","ru":"осваивать","vi":"tiếp thu, học được","zht":"掌握、習得"},0,"ch6-r"],["바람직하다",{"en":"desirable","zh":"可取的、理想的","th":"น่าปรารถนา, ควรจะเป็น","ru":"быть желательным","vi":"đáng mong muốn, nên làm","zht":"可取的、理想的"},1,"ch6-r"],["유리하다",{"en":"advantageous","zh":"有利","th":"ได้เปรียบ","ru":"быть выгодным","vi":"có lợi, thuận lợi","zht":"有利"},1,"ch6-r"],["팽팽하다",{"en":"evenly matched","zh":"势均力敌","th":"สูสี, ตึง","ru":"быть равным по силам","vi":"ngang ngửa","zht":"勢均力敵"},1,"ch6-r"],["대단히",{"en":"greatly","zh":"非常、极其","th":"อย่างมาก","ru":"весьма","vi":"rất, vô cùng","zht":"非常、極其"},0,"ch6-r"],["종종",{"en":"from time to time","zh":"时常、偶尔","th":"บางครั้ง, เป็นครั้งคราว","ru":"время от времени","vi":"thỉnh thoảng","zht":"時常、偶爾"},0,"ch6-r"],["별 차이가 없다",{"en":"to make little difference","zh":"没什么差别","th":"ไม่ต่างกันมาก","ru":"не иметь большой разницы","vi":"không khác biệt mấy","zht":"沒什麼差別"},1,"ch6-r"],["영향을 미치다",{"en":"to have an influence on","zh":"对……产生影响","th":"มีอิทธิพลต่อ","ru":"оказывать влияние на","vi":"gây ảnh hưởng đến","zht":"對……產生影響"},1,"ch6-r"],["일리가 있다",{"en":"to have a point","zh":"有道理","th":"มีเหตุผล, มีประเด็น","ru":"в этом есть смысл","vi":"có lý, có phần đúng","zht":"有道理"},1,"ch6-r"],["입장을 밝히다",{"en":"to state one's position","zh":"表明立场","th":"แสดงจุดยืน","ru":"заявить свою позицию","vi":"nêu rõ lập trường, quan điểm","zht":"表明立場"},1,"ch6-r"],["정체성을 갖추다",{"en":"to establish an identity","zh":"确立自我认同、形成特色","th":"สร้างเอกลักษณ์","ru":"обрести идентичность","vi":"xây dựng bản sắc","zht":"確立自我認同、形成特色"},1,"ch6-r"],["위생",{"en":"hygiene","zh":"卫生","th":"สุขอนามัย","ru":"гигиена","vi":"vệ sinh","zht":"衛生"},0,"ch7-v"],["생필품",{"en":"daily necessities","zh":"生活必需品","th":"ของใช้จำเป็นในชีวิตประจำวัน","ru":"предметы первой необходимости","vi":"nhu yếu phẩm hàng ngày","zht":"生活必需品"},0,"ch7-v"],["채워지다",{"en":"to be filled","zh":"被填满、被装满","th":"ถูกเติมเต็ม, เต็ม","ru":"наполняться","vi":"được lấp đầy","zht":"被填滿、被裝滿"},0,"ch7-v"],["순식간",{"en":"an instant","zh":"转眼间、一瞬间","th":"ชั่วพริบตา","ru":"мгновение","vi":"chớp mắt, trong nháy mắt","zht":"轉眼間、一瞬間"},0,"ch7-v"],["여러모로",{"en":"in many ways","zh":"在很多方面","th":"ในหลายด้าน","ru":"во многих отношениях","vi":"về nhiều mặt","zht":"在很多方面"},1,"ch7-v"],["심지어",{"en":"even","zh":"甚至、乃至","th":"แม้กระทั่ง, ซ้ำร้าย","ru":"даже","vi":"thậm chí","zht":"甚至、乃至"},1,"ch7-v"],["꾹",{"en":"firmly","zh":"使劲地、强忍着","th":"แน่น ๆ, หนักแน่น","ru":"крепко","vi":"chặt, dứt khoát","zht":"使勁地、強忍著"},0,"ch7-v"],["훼손되다",{"en":"to be damaged","zh":"被损坏、受损","th":"ถูกทำลาย, เสียหาย","ru":"быть повреждённым, испорченным","vi":"bị hư hại","zht":"被損壞、受損"},1,"ch7-v"],["장보기",{"en":"grocery shopping","zh":"买菜、采购","th":"การไปซื้อของสด/ของใช้","ru":"поход за продуктами","vi":"đi chợ, mua sắm thực phẩm","zht":"買菜、採購"},0,"ch7-v"],["망",{"en":"net","zh":"网兜、网袋","th":"ตาข่าย, ถุงตาข่าย","ru":"сетка","vi":"lưới, túi lưới","zht":"網兜、網袋"},0,"ch7-v"],["재택근무",{"en":"working from home","zh":"居家办公、在家工作","th":"การทำงานที่บ้าน","ru":"удалённая работа","vi":"làm việc tại nhà","zht":"居家辦公、在家工作"},0,"ch7-v"],["반조리",{"en":"semi-cooked","zh":"半成品","th":"กึ่งสำเร็จรูป","ru":"полуфабрикат","vi":"nấu sẵn một phần","zht":"半成品"},0,"ch7-v"],["꺼림칙하다",{"en":"uneasy","zh":"心里发毛、不踏实、膈应","th":"รู้สึกไม่สบายใจ, ติดขัดใจ","ru":"быть неприятным","vi":"áy náy, khó chịu trong lòng","zht":"心裡發毛、不踏實、膈應"},1,"ch7-v"],["교체되다",{"en":"to be replaced","zh":"被更换","th":"ถูกเปลี่ยน, ถูกแทนที่","ru":"заменяться","vi":"được thay thế","zht":"被更換"},1,"ch7-v"],["용기",{"en":"container","zh":"容器","th":"ภาชนะ, กล่อง","ru":"ёмкость","vi":"hộp đựng, đồ chứa","zht":"容器"},0,"ch7-v"],["합성",{"en":"synthetic","zh":"合成","th":"สังเคราะห์","ru":"синтетический","vi":"tổng hợp","zht":"合成"},0,"ch7-v"],["유용하다",{"en":"useful","zh":"有用","th":"มีประโยชน์","ru":"быть полезным","vi":"hữu ích","zht":"有用"},1,"ch7-v"],["푸짐하다",{"en":"generous","zh":"丰盛、量大实惠","th":"เยอะแยะ, อิ่มหนำ","ru":"быть обильным, щедрым","vi":"đầy đặn, thịnh soạn","zht":"豐盛、量大實惠"},1,"ch7-v"],["집밥",{"en":"home-cooked meal","zh":"家常饭、在家做的饭","th":"อาหารที่ทำกินที่บ้าน","ru":"домашняя еда","vi":"cơm nhà","zht":"家常飯、在家做的飯"},0,"ch7-v"],["조물주",{"en":"the Creator","zh":"造物主","th":"ผู้สร้าง","ru":"Создатель","vi":"Đấng tạo hóa","zht":"造物主"},0,"ch7-v"],["치우다",{"en":"to clear away","zh":"收拾、清理走","th":"เก็บกวาด, ยกออกไป","ru":"убирать","vi":"dọn dẹp, dọn đi","zht":"收拾、清理走"},1,"ch7-v"],["뜯다",{"en":"to tear open","zh":"撕开、拆开","th":"ฉีก, แกะ","ru":"вскрывать","vi":"xé, mở ra","zht":"撕開、拆開"},1,"ch7-v"],["전락하다",{"en":"to be reduced to","zh":"沦为、堕落成","th":"ตกต่ำลงเป็น..., กลายสภาพเป็น","ru":"скатиться до","vi":"sa sút, rơi xuống thành","zht":"淪為、墮落成"},0,"ch7-v"],["-당",{"en":"per","zh":"每……","th":"ต่อ..., ละ","ru":"на каждый","vi":"mỗi","zht":"每……"},0,"ch7-v"],["헹구다",{"en":"to rinse","zh":"漂洗、冲洗","th":"ล้าง, ชะล้าง","ru":"ополаскивать","vi":"xả, tráng","zht":"漂洗、沖洗"},1,"ch7-v"],["도리",{"en":"duty","zh":"道理、本分","th":"หน้าที่ที่ควรทำ, ทางเลือก","ru":"долг, обязанность","vi":"đạo lý, bổn phận","zht":"道理、本分"},1,"ch7-v"],["숨통이 트이다",{"en":"to get breathing room","zh":"松口气、喘过气来","th":"ได้หายใจโล่ง, มีที่ให้ผ่อนคลาย","ru":"вздохнуть свободно","vi":"được thở phào, bớt ngột ngạt","zht":"鬆口氣、喘過氣來"},1,"ch7-v"],["믿는 구석이 있다",{"en":"to have something to fall back on","zh":"有靠山、有底气","th":"มีที่พึ่ง, มีของไว้พึ่งพา","ru":"иметь опору, запасной вариант","vi":"có chỗ dựa","zht":"有靠山、有底氣"},1,"ch7-v"],["망신",{"en":"disgrace","zh":"丢脸、出丑","th":"ความอับอาย, ความขายหน้า","ru":"позор","vi":"mất mặt, xấu hổ","zht":"丟臉、出醜"},0,"ch7-r"],["반응",{"en":"reaction","zh":"反应、反响","th":"ปฏิกิริยา, การตอบสนอง","ru":"реакция","vi":"phản ứng","zht":"反應、反響"},1,"ch7-r"],["부",{"en":"department","zh":"部、部门","th":"ฝ่าย, แผนก","ru":"отдел","vi":"bộ phận, phòng ban","zht":"部、部門"},0,"ch7-r"],["안색",{"en":"complexion","zh":"脸色、气色","th":"สีหน้า, ผิวพรรณ","ru":"цвет лица","vi":"sắc mặt","zht":"臉色、氣色"},0,"ch7-r"],["지칭",{"en":"designation","zh":"称呼","th":"การเรียก/อ้างถึงด้วยคำเรียก","ru":"обозначение","vi":"sự chỉ gọi, cách gọi","zht":"稱呼"},0,"ch7-r"],["직함",{"en":"job title","zh":"头衔、职称","th":"ตำแหน่งงาน","ru":"должность","vi":"chức danh","zht":"頭銜、職稱"},1,"ch7-r"],["호칭어",{"en":"term of address","zh":"称呼语","th":"คำเรียกขาน","ru":"обращение","vi":"từ xưng hô","zht":"稱呼語"},0,"ch7-r"],["홍보",{"en":"promotion","zh":"宣传、公关","th":"การประชาสัมพันธ์","ru":"реклама","vi":"quảng bá, quan hệ công chúng","zht":"宣傳、公關"},0,"ch7-r"],["저지르다",{"en":"to commit","zh":"犯、闯","th":"ก่อ, ทำพลาด","ru":"совершить","vi":"gây ra, phạm","zht":"犯、闖"},1,"ch7-r"],["못지않다",{"en":"no less than","zh":"不亚于、不比……差","th":"ไม่น้อยหน้า, ไม่แพ้","ru":"не хуже","vi":"không thua kém","zht":"不亞於、不比……差"},1,"ch7-r"],["무례하다",{"en":"rude","zh":"无礼、没礼貌","th":"หยาบคาย, เสียมารยาท","ru":"быть невежливым, грубым","vi":"vô lễ, bất lịch sự","zht":"無禮、沒禮貌"},1,"ch7-r"],["어설프다",{"en":"clumsy","zh":"生疏、笨拙、不熟练","th":"ทื่อ ๆ, ไม่เนียน, ไม่ชำนาญ","ru":"быть неловким, неумелым","vi":"vụng về, non tay","zht":"生疏、笨拙、不熟練"},0,"ch7-r"],["유창하다",{"en":"fluent","zh":"流利","th":"คล่องแคล่ว, ชัดเจน","ru":"быть беглым, свободным","vi":"lưu loát, trôi chảy","zht":"流利"},0,"ch7-r"],["사모님",{"en":"madam","zh":"太太、夫人","th":"คุณนาย, คุณผู้หญิง","ru":"госпожа","vi":"bà","zht":"太太、夫人"},1,"ch7-r"],["그쪽",{"en":"'you'","zh":"那边的人、你","th":"ทางนั้น, คุณ","ru":"вы","vi":"bên đó, anh/chị","zht":"那邊的人、你"},1,"ch7-r"],["저기요",{"en":"excuse me","zh":"请问、劳驾","th":"ขอโทษนะคะ/ครับ","ru":"извините","vi":"xin lỗi, này","zht":"請問、勞駕"},1,"ch7-r"],["뭐니 뭐니 해도",{"en":"when all is said and done","zh":"说来说去、归根结底","th":"ยังไงก็ตาม, สุดท้ายแล้ว","ru":"что ни говори","vi":"nói đi nói lại thì","zht":"說來說去、歸根結底"},1,"ch7-r"],["강의록",{"en":"lecture notes","zh":"讲义、课堂笔记","th":"บันทึกการเรียน, สรุปคำบรรยาย","ru":"конспект лекции","vi":"bài giảng chép lại","zht":"講義、課堂筆記"},0,"ch7-r"],["남미",{"en":"South America","zh":"南美洲","th":"อเมริกาใต้","ru":"Южная Америка","vi":"Nam Mỹ","zht":"南美洲"},0,"ch7-r"],["동그라미",{"en":"circle","zh":"圆圈","th":"วงกลม","ru":"кружок","vi":"hình tròn, vòng tròn","zht":"圓圈"},1,"ch7-r"],["동성연애",{"en":"same-sex relationship","zh":"同性恋","th":"ความสัมพันธ์เพศเดียวกัน","ru":"однополые отношения","vi":"quan hệ đồng tính","zht":"同性戀"},0,"ch7-r"],["몸짓언어",{"en":"body language","zh":"肢体语言","th":"ภาษากาย","ru":"язык тела","vi":"ngôn ngữ cơ thể, cử chỉ","zht":"肢體語言"},0,"ch7-r"],["문화권",{"en":"cultural sphere","zh":"文化圈","th":"วงวัฒนธรรม, ภูมิภาคทางวัฒนธรรม","ru":"культурный ареал","vi":"vùng văn hóa, khu vực văn hóa","zht":"文化圈"},1,"ch7-r"],["배경",{"en":"background","zh":"背景","th":"ฉากหลัง, ภูมิหลัง","ru":"фон","vi":"bối cảnh, nền","zht":"背景"},1,"ch7-r"],["보편적",{"en":"universal","zh":"普遍的","th":"เป็นสากล, ทั่วไป","ru":"всеобщий","vi":"phổ biến, mang tính phổ quát","zht":"普遍的"},1,"ch7-r"],["비웃음",{"en":"ridicule","zh":"嘲笑、讥笑","th":"การเยาะเย้ย","ru":"насмешка","vi":"sự chế nhạo, cười nhạo","zht":"嘲笑、譏笑"},0,"ch7-r"],["자세",{"en":"posture","zh":"姿势、姿态","th":"ท่าทาง, ท่านั่ง/ยืน","ru":"поза","vi":"tư thế","zht":"姿勢、姿態"},0,"ch7-r"],["좌우",{"en":"left and right","zh":"左右","th":"ซ้ายขวา","ru":"лево-право","vi":"trái phải","zht":"左右"},1,"ch7-r"],["지중해",{"en":"the Mediterranean","zh":"地中海","th":"ทะเลเมดิเตอร์เรเนียน","ru":"Средиземное море","vi":"Địa Trung Hải","zht":"地中海"},0,"ch7-r"],["턱",{"en":"chin","zh":"下巴","th":"คาง","ru":"подбородок","vi":"cằm","zht":"下巴"},0,"ch7-r"],["팔짱",{"en":"folded arms","zh":"抱臂","th":"การกอดอก","ru":"скрещённые руки","vi":"khoanh tay","zht":"抱臂"},0,"ch7-r"],["포옹",{"en":"hug","zh":"拥抱","th":"การกอด","ru":"объятие","vi":"cái ôm","zht":"擁抱"},1,"ch7-r"],["결합되다",{"en":"to be combined","zh":"结合、合在一起","th":"ถูกรวมเข้าด้วยกัน","ru":"быть соединённым, объединённым","vi":"được kết hợp","zht":"結合、合在一起"},0,"ch7-r"],["고려하다",{"en":"to consider","zh":"考虑","th":"พิจารณา, คำนึงถึง","ru":"учитывать","vi":"cân nhắc, xem xét","zht":"考慮"},1,"ch7-r"],["굽히다",{"en":"to bend","zh":"弯曲、鞠躬","th":"งอ, โค้ง","ru":"сгибать","vi":"cúi, uốn cong","zht":"彎曲、鞠躬"},0,"ch7-r"],["끄덕이다",{"en":"to nod","zh":"点头","th":"พยักหน้า","ru":"кивать","vi":"gật đầu","zht":"點頭"},0,"ch7-r"],["끼다",{"en":"to fold","zh":"抱、夹、插入","th":"กอด, สอดไว้","ru":"скрестить","vi":"khoanh, luồn, kẹp","zht":"抱、夾、插入"},0,"ch7-r"],["뻗다",{"en":"to stretch out","zh":"伸展、伸出","th":"ยื่นออกไป, เหยียด","ru":"протягивать","vi":"duỗi ra, vươn ra","zht":"伸展、伸出"},0,"ch7-r"],["찡그리다",{"en":"to frown","zh":"皱眉、皱起","th":"ขมวดคิ้ว, ทำหน้าบูด","ru":"хмуриться","vi":"nhăn, cau có","zht":"皺眉、皺起"},1,"ch7-r"],["해석되다",{"en":"to be interpreted","zh":"被解读、被解释","th":"ถูกตีความ","ru":"толковаться","vi":"được giải thích, được hiểu là","zht":"被解讀、被解釋"},1,"ch7-r"],["해석하다",{"en":"to interpret","zh":"解读、解释","th":"ตีความ","ru":"толковать","vi":"giải thích, diễn giải","zht":"解讀、解釋"},1,"ch7-r"],["가볍다",{"en":"light","zh":"轻、轻微","th":"เบา, เล็กน้อย","ru":"быть лёгким","vi":"nhẹ, nhẹ nhàng","zht":"輕、輕微"},0,"ch7-r"],["마주",{"en":"face to face","zh":"面对面","th":"ประจันหน้า, เผชิญหน้ากัน","ru":"лицом к лицу","vi":"đối diện, mặt đối mặt","zht":"面對面"},0,"ch7-r"],["아무런",{"en":"not any","zh":"任何……","th":"ไม่มี...ใด ๆ เลย","ru":"никакой","vi":"không... nào cả","zht":"任何……"},0,"ch7-r"],["잘돼 가다",{"en":"to be going well","zh":"进展顺利","th":"ไปได้ด้วยดี","ru":"идти хорошо","vi":"đang tiến triển tốt","zht":"進展順利"},0,"ch7-r"],["분류",{"en":"sorting","zh":"分类","th":"การคัดแยก, การจัดประเภท","ru":"сортировка","vi":"sự phân loại","zht":"分類"},1,"ch8-v"],["마개",{"en":"cap","zh":"瓶盖、塞子","th":"ฝา, จุกปิด","ru":"пробка","vi":"nắp, nút chai","zht":"瓶蓋、塞子"},0,"ch8-v"],["압축",{"en":"compression","zh":"压缩","th":"การอัด, การบีบอัด","ru":"сжатие","vi":"nén, ép","zht":"壓縮"},1,"ch8-v"],["분리배출",{"en":"separated waste disposal","zh":"垃圾分类回收","th":"การทิ้งขยะแบบแยกประเภท","ru":"раздельный сбор мусора","vi":"phân loại rác để thải","zht":"垃圾分類回收"},1,"ch8-v"],["공정",{"en":"process","zh":"工序、流程","th":"ขั้นตอนการผลิต","ru":"процесс","vi":"công đoạn","zht":"工序、流程"},0,"ch8-v"],["복합 재질",{"en":"composite material","zh":"复合材质","th":"วัสดุผสม","ru":"композитный материал","vi":"vật liệu tổng hợp nhiều lớp","zht":"複合材質"},0,"ch8-v"],["선별",{"en":"sorting","zh":"分拣、筛选","th":"การคัดเลือก, การคัดแยก","ru":"сортировка","vi":"sàng lọc, phân loại","zht":"分揀、篩選"},0,"ch8-v"],["종량제 봉투",{"en":"pay-per-volume trash bag","zh":"计量收费垃圾袋","th":"ถุงขยะแบบเสียตามปริมาณ","ru":"мешок для мусора","vi":"túi rác tính phí theo dung tích","zht":"計量收費垃圾袋"},1,"ch8-v"],["품목",{"en":"item","zh":"品类、项目","th":"รายการสินค้า, ประเภทสิ่งของ","ru":"наименование","vi":"hạng mục, mặt hàng","zht":"品類、專案"},0,"ch8-v"],["포장재",{"en":"packaging material","zh":"包装材料","th":"วัสดุบรรจุภัณฑ์","ru":"упаковочный материал","vi":"vật liệu đóng gói","zht":"包裝材料"},0,"ch8-v"],["난감하다",{"en":"to be at a loss","zh":"为难、棘手、不知如何是好","th":"จนปัญญา, ลำบากใจ","ru":"быть в затруднении, в тупике","vi":"khó xử, lúng túng","zht":"為難、棘手、不知如何是好"},1,"ch8-v"],["날",{"en":"blade","zh":"刀刃、刃","th":"ใบมีด, คม","ru":"лезвие","vi":"lưỡi","zht":"刀刃、刃"},0,"ch8-v"],["폐기되다",{"en":"to be discarded","zh":"被废弃、被丢弃","th":"ถูกทิ้ง, ถูกทำลายทิ้ง","ru":"быть выброшенным, списанным","vi":"bị vứt bỏ, bị loại","zht":"被廢棄、被丟棄"},0,"ch8-v"],["관심도",{"en":"level of interest","zh":"关注度","th":"ระดับความสนใจ","ru":"степень интереса","vi":"mức độ quan tâm","zht":"關注度"},0,"ch8-v"],["한정하다",{"en":"to limit","zh":"限定于、限制在","th":"จำกัด","ru":"ограничивать","vi":"giới hạn","zht":"限定於、限制在"},1,"ch8-v"],["추정",{"en":"estimation","zh":"推测、估计","th":"การประมาณการ","ru":"предположение","vi":"sự ước tính","zht":"推測、估計"},0,"ch8-v"],["생활화",{"en":"making a daily habit","zh":"成为日常习惯","th":"การทำให้เป็นนิสัยในชีวิตประจำวัน","ru":"превращение в повседневную привычку","vi":"biến thành thói quen hàng ngày","zht":"成為日常習慣"},0,"ch8-v"],["의아하다",{"en":"puzzled","zh":"疑惑、纳闷","th":"สงสัย, แปลกใจ","ru":"недоумевать","vi":"thắc mắc, khó hiểu","zht":"疑惑、納悶"},1,"ch8-v"],["치명타",{"en":"fatal blow","zh":"致命一击","th":"ผลกระทบร้ายแรง","ru":"смертельный удар","vi":"đòn chí mạng","zht":"致命一擊"},0,"ch8-v"],["복구하다",{"en":"to restore","zh":"恢复、修复","th":"ฟื้นฟู, กู้คืน","ru":"восстанавливать","vi":"khôi phục","zht":"恢復、修復"},1,"ch8-v"],["접근하다",{"en":"to approach","zh":"接近、靠近、着手","th":"เข้าใกล้, เข้าหา","ru":"приближаться","vi":"tiếp cận","zht":"接近、靠近、著手"},1,"ch8-v"],["맞아떨어지다",{"en":"to fit perfectly","zh":"吻合、恰好符合","th":"ลงตัวพอดี, ตรงกันพอดี","ru":"сходиться точно","vi":"khớp, trùng khớp","zht":"吻合、恰好符合"},1,"ch8-v"],["문제를 일으키다",{"en":"to cause trouble","zh":"惹麻烦、引起问题","th":"ก่อปัญหา","ru":"вызывать проблемы","vi":"gây ra rắc rối, gây vấn đề","zht":"惹麻煩、引起問題"},1,"ch8-v"],["갓",{"en":"gat","zh":"韩式马尾帽","th":"คัท","ru":"кат","vi":"gat","zht":"韓式馬尾帽"},0,"ch8-r"],["구경꾼",{"en":"onlooker","zh":"旁观者、看热闹的人","th":"ผู้ชม, คนดู","ru":"зевака","vi":"người xem, khán giả","zht":"旁觀者、看熱鬧的人"},0,"ch8-r"],["깍지",{"en":"interlocked fingers","zh":"十指交叉","th":"การประสานนิ้วมือเข้าด้วยกัน","ru":"сцепленные пальцы","vi":"đan các ngón tay vào nhau","zht":"十指交叉"},0,"ch8-r"],["손등",{"en":"back of the hand","zh":"手背","th":"หลังมือ","ru":"тыльная сторона ладони","vi":"mu bàn tay","zht":"手背"},0,"ch8-r"],["승부",{"en":"match","zh":"胜负、比赛","th":"การแพ้ชนะ, ผลแพ้ชนะ","ru":"исход состязания","vi":"thắng thua, kết quả trận đấu","zht":"勝負、比賽"},1,"ch8-r"],["씨름꾼",{"en":"ssireum wrestler","zh":"摔跤手","th":"นักมวยปล้ำซีรึม","ru":"борец ссирым","vi":"đô vật ssireum","zht":"摔跤手"},0,"ch8-r"],["악사",{"en":"musician","zh":"乐师","th":"นักดนตรี","ru":"музыкант","vi":"nhạc công","zht":"樂師"},0,"ch8-r"],["안간힘",{"en":"desperate effort","zh":"拼命努力、使出浑身力气","th":"ความพยายามสุดกำลัง","ru":"отчаянные усилия","vi":"sức lực cuối cùng, cố hết sức","zht":"拼命努力、使出渾身力氣"},0,"ch8-r"],["율동",{"en":"rhythmic movement","zh":"律动、有节奏的动作","th":"ท่าเคลื่อนไหวเข้าจังหวะ","ru":"ритмичные движения","vi":"chuyển động nhịp nhàng","zht":"律動、有節奏的動作"},0,"ch8-r"],["입술",{"en":"lips","zh":"嘴唇","th":"ริมฝีปาก","ru":"губы","vi":"môi","zht":"嘴唇"},0,"ch8-r"],["편",{"en":"side","zh":"方、一边、队","th":"ฝ่าย, ทีม, ข้าง","ru":"сторона","vi":"phe, bên, đội","zht":"方、一邊、隊"},0,"ch8-r"],["관찰하다",{"en":"to observe","zh":"观察","th":"สังเกต","ru":"наблюдать","vi":"quan sát","zht":"觀察"},1,"ch8-r"],["넘어뜨리다",{"en":"to knock down","zh":"推倒、摔倒对方","th":"ผลักล้ม, ทำให้ล้ม","ru":"повалить","vi":"làm ngã, quật ngã","zht":"推倒、摔倒對方"},0,"ch8-r"],["넘치다",{"en":"to overflow","zh":"溢出、充满","th":"ล้น, เอ่อ","ru":"переливаться через край","vi":"tràn đầy, tràn ra","zht":"溢位、充滿"},0,"ch8-r"],["어우러지다",{"en":"to blend together","zh":"融合、相配","th":"กลมกลืน, เข้ากันได้ดี","ru":"гармонировать","vi":"hòa quyện, hòa hợp","zht":"融合、相配"},0,"ch8-r"],["장난치다",{"en":"to play around","zh":"闹着玩、开玩笑","th":"เล่นซน, หยอกล้อ","ru":"баловаться","vi":"đùa nghịch","zht":"鬧著玩、開玩笑"},0,"ch8-r"],["찌푸리다",{"en":"to scrunch","zh":"皱起","th":"ขมวดคิ้ว, ทำหน้าบูดบึ้ง","ru":"хмуриться","vi":"nhăn, cau mày","zht":"皺起"},1,"ch8-r"],["삼각형",{"en":"a triangle","zh":"三角形","th":"สามเหลี่ยม","ru":"треугольник","vi":"hình tam giác","zht":"三角形"},0,"ch8-r"],["정사각형",{"en":"a square","zh":"正方形","th":"สี่เหลี่ยมจัตุรัส","ru":"квадрат","vi":"hình vuông","zht":"正方形"},0,"ch8-r"],["직사각형",{"en":"a rectangle","zh":"长方形","th":"สี่เหลี่ยมผืนผ้า","ru":"прямоугольник","vi":"hình chữ nhật","zht":"長方形"},0,"ch8-r"],["정육면체",{"en":"a cube","zh":"正方体","th":"ลูกบาศก์","ru":"куб","vi":"hình lập phương","zht":"正方體"},0,"ch8-r"],["원형",{"en":"a circle","zh":"圆形","th":"วงกลม, รูปทรงกลม","ru":"круглая форма","vi":"hình tròn","zht":"圓形"},0,"ch8-r"],["원뿔형",{"en":"a cone shape","zh":"圆锥形","th":"ทรงกรวย","ru":"форма конуса","vi":"hình nón","zht":"圓錐形"},0,"ch8-r"],["원기둥형",{"en":"a cylinder shape","zh":"圆柱形","th":"ทรงกระบอก","ru":"форма цилиндра","vi":"hình trụ","zht":"圓柱形"},0,"ch8-r"],["타원형",{"en":"an oval","zh":"椭圆形","th":"วงรี","ru":"овал","vi":"hình bầu dục, hình elip","zht":"橢圓形"},0,"ch8-r"],["둥글다",{"en":"to be round","zh":"圆的","th":"กลม","ru":"быть круглым","vi":"tròn","zht":"圓的"},1,"ch8-r"],["유리",{"en":"glass","zh":"玻璃","th":"แก้ว","ru":"стекло","vi":"thủy tinh, kính","zht":"玻璃"},1,"ch8-r"],["나무",{"en":"wood","zh":"木头","th":"ไม้","ru":"дерево","vi":"gỗ","zht":"木頭"},0,"ch8-r"],["금속",{"en":"metal","zh":"金属","th":"โลหะ","ru":"металл","vi":"kim loại","zht":"金屬"},1,"ch8-r"],["금",{"en":"gold","zh":"金、黄金","th":"ทอง","ru":"золото","vi":"vàng","zht":"金、黃金"},0,"ch8-r"],["은",{"en":"silver","zh":"银","th":"เงิน","ru":"серебро","vi":"bạc","zht":"銀"},0,"ch8-r"],["철",{"en":"iron","zh":"铁","th":"เหล็ก","ru":"железо","vi":"sắt","zht":"鐵"},0,"ch8-r"],["흙",{"en":"soil","zh":"泥土、黏土","th":"ดิน","ru":"почва","vi":"đất","zht":"泥土、黏土"},0,"ch8-r"],["플라스틱",{"en":"plastic","zh":"塑料","th":"พลาสติก","ru":"пластик","vi":"nhựa","zht":"塑膠"},1,"ch8-r"],["천",{"en":"cloth, fabric","zh":"布、布料","th":"ผ้า","ru":"ткань","vi":"vải","zht":"布、布料"},1,"ch8-r"],["가죽",{"en":"leather","zh":"皮革","th":"หนัง","ru":"кожа","vi":"da","zht":"皮革"},1,"ch8-r"],["딱딱하다",{"en":"to be hard, stiff","zh":"硬、坚硬","th":"แข็ง","ru":"быть твёрдым, жёстким","vi":"cứng","zht":"硬、堅硬"},1,"ch8-r"],["부드럽다",{"en":"to be soft, smooth","zh":"柔软、顺滑","th":"นุ่ม, เรียบนุ่ม","ru":"быть мягким, гладким","vi":"mềm, mịn","zht":"柔軟、順滑"},1,"ch8-r"],["완만하다",{"en":"gentle","zh":"平缓","th":"ลาดเอียงเล็กน้อย","ru":"быть пологим","vi":"thoai thoải, dốc nhẹ","zht":"平緩"},0,"ch8-r"],["가파르다",{"en":"steep","zh":"陡峭","th":"ชัน","ru":"быть крутым","vi":"dốc đứng","zht":"陡峭"},0,"ch8-r"],["평평하다",{"en":"flat","zh":"平坦","th":"ราบเรียบ","ru":"быть плоским, ровным","vi":"bằng phẳng","zht":"平坦"},0,"ch8-r"],["울퉁불퉁하다",{"en":"bumpy","zh":"坑坑洼洼、凹凸不平","th":"ขรุขระ","ru":"быть неровным, ухабистым","vi":"gồ ghề, lồi lõm","zht":"坑坑窪窪、凹凸不平"},0,"ch8-r"],["구불구불하다",{"en":"winding","zh":"弯弯曲曲","th":"คดเคี้ยว","ru":"быть извилистым","vi":"ngoằn ngoèo, quanh co","zht":"彎彎曲曲"},0,"ch8-r"],["길쭉하다",{"en":"longish","zh":"细长","th":"ค่อนข้างยาว, เรียวยาว","ru":"быть продолговатым","vi":"dài dài, thon dài","zht":"細長"},0,"ch8-r"],["네모나다",{"en":"square-shaped","zh":"方形的、四四方方","th":"เป็นสี่เหลี่ยม","ru":"быть квадратным","vi":"vuông vuông, hình vuông","zht":"方形的、四四方方"},0,"ch8-r"],["푹신하다",{"en":"cushy","zh":"松软、软乎乎","th":"นุ่มนิ่ม, ยวบ","ru":"быть мягким, пушистым","vi":"êm, mềm mại","zht":"鬆軟、軟乎乎"},0,"ch8-r"],["투명하다",{"en":"transparent","zh":"透明","th":"โปร่งใส","ru":"быть прозрачным","vi":"trong suốt","zht":"透明"},0,"ch8-r"],["잔잔하다",{"en":"calm","zh":"平静","th":"สงบนิ่ง, เรียบ","ru":"быть тихим, спокойным","vi":"lặng sóng, êm ả","zht":"平靜"},0,"ch8-r"],["얕다",{"en":"shallow","zh":"浅","th":"ตื้น","ru":"быть мелким","vi":"nông","zht":"淺"},0,"ch8-r"],["수평선",{"en":"horizon","zh":"海平线、地平线","th":"เส้นขอบฟ้า","ru":"линия горизонта","vi":"đường chân trời","zht":"海平線、地平線"},0,"ch8-r"],["오르막길",{"en":"uphill road","zh":"上坡路","th":"ทางขึ้นเนิน","ru":"дорога в гору","vi":"đường dốc lên","zht":"上坡路"},0,"ch8-r"],["내리막길",{"en":"downhill road","zh":"下坡路","th":"ทางลงเนิน","ru":"дорога под гору","vi":"đường dốc xuống","zht":"下坡路"},0,"ch8-r"],["가명",{"en":"a false name","zh":"假名、笔名","th":"นามแฝง","ru":"вымышленное имя","vi":"tên giả, bút danh","zht":"假名、筆名"},0,"ch8-r"],["낙서",{"en":"doodle","zh":"涂鸦","th":"การเขียนเล่น/ขีดเขียน","ru":"каракули","vi":"vẽ bậy, chữ viết nguệch ngoạc","zht":"塗鴉"},0,"ch8-r"],["불안감",{"en":"anxiety","zh":"不安感、焦虑","th":"ความรู้สึกกังวล/วิตก","ru":"чувство тревоги","vi":"cảm giác bất an","zht":"不安感、焦慮"},1,"ch8-r"],["신경쇠약",{"en":"nervous breakdown","zh":"神经衰弱","th":"โรคประสาทอ่อน","ru":"нервное расстройство","vi":"suy nhược thần kinh","zht":"神經衰弱"},0,"ch8-r"],["안정감",{"en":"sense of stability","zh":"安定感、踏实感","th":"ความรู้สึกมั่นคง","ru":"чувство стабильности","vi":"cảm giác ổn định, yên tâm","zht":"安定感、踏實感"},0,"ch8-r"],["의문",{"en":"question","zh":"疑问、疑惑","th":"คำถาม, ข้อสงสัย","ru":"вопрос","vi":"nghi vấn, nghi ngờ","zht":"疑問、疑惑"},0,"ch8-r"],["일부",{"en":"a part","zh":"一部分","th":"บางส่วน","ru":"часть","vi":"một phần","zht":"一部分"},0,"ch8-r"],["정신과",{"en":"psychiatry","zh":"精神科","th":"แผนกจิตเวช","ru":"психиатрия","vi":"khoa tâm thần","zht":"精神科"},1,"ch8-r"],["즐거움",{"en":"joy","zh":"快乐、乐趣","th":"ความสุข, ความเพลิดเพลิน","ru":"радость","vi":"niềm vui, sự thích thú","zht":"快樂、樂趣"},0,"ch8-r"],["지수",{"en":"index","zh":"指数、水平","th":"ดัชนี, ระดับ","ru":"индекс","vi":"chỉ số, mức độ","zht":"指數、水平"},1,"ch8-r"],["지적",{"en":"intellectual","zh":"知性的、智力的","th":"เชิงปัญญา, ทางสติปัญญา","ru":"интеллектуальный","vi":"mang tính trí tuệ","zht":"知性的、智力的"},0,"ch8-r"],["진실",{"en":"truth","zh":"真相、真实","th":"ความจริง","ru":"правда","vi":"sự thật, chân lý","zht":"真相、真實"},1,"ch8-r"],["회복",{"en":"recovery","zh":"恢复、康复","th":"การฟื้นตัว","ru":"выздоровление","vi":"sự hồi phục","zht":"恢復、康復"},1,"ch8-r"],["감상하다",{"en":"to appreciate","zh":"欣赏","th":"ชื่นชม, ดื่มด่ำ","ru":"любоваться","vi":"thưởng thức, chiêm ngưỡng","zht":"欣賞"},0,"ch8-r"],["다루다",{"en":"to handle","zh":"处理、对待、涉及","th":"จัดการ, ดูแล, ปฏิบัติต่อ","ru":"обращаться","vi":"xử lý, đề cập đến, sử dụng","zht":"處理、對待、涉及"},0,"ch8-r"],["덜다",{"en":"to relieve","zh":"减轻、减少","th":"ลด, บรรเทา","ru":"облегчать","vi":"giảm bớt, làm nhẹ đi","zht":"減輕、減少"},0,"ch8-r"],["드러나다",{"en":"to be revealed","zh":"显露、暴露","th":"ปรากฏ, เปิดเผยออกมา","ru":"обнаруживаться","vi":"lộ ra, bị phát hiện","zht":"顯露、暴露"},0,"ch8-r"],["떠올리다",{"en":"to call to mind","zh":"想起、回想起","th":"นึกถึง, ระลึกได้","ru":"вспоминать","vi":"nhớ lại, nghĩ đến","zht":"想起、回想起"},0,"ch8-r"],["앓다",{"en":"to suffer from","zh":"患、受病痛折磨","th":"ป่วยเป็น","ru":"болеть","vi":"mắc bệnh, đau ốm","zht":"患、受病痛折磨"},1,"ch8-r"],["재현하다",{"en":"to reproduce","zh":"再现、重现","th":"จำลอง, สร้างขึ้นใหม่","ru":"воспроизводить","vi":"tái hiện, tái dựng","zht":"再現、重現"},0,"ch8-r"],["해소되다",{"en":"to be relieved","zh":"得到缓解","th":"ถูกบรรเทา, คลี่คลาย","ru":"рассеиваться","vi":"được giải tỏa","zht":"得到緩解"},1,"ch8-r"],["해소하다",{"en":"to relieve","zh":"缓解、消除","th":"คลายเครียด, บรรเทา","ru":"снимать","vi":"giải tỏa","zht":"緩解、消除"},0,"ch8-r"],["두렵다",{"en":"fearful","zh":"害怕、畏惧","th":"น่ากลัว, หวาดกลัว","ru":"быть страшным","vi":"đáng sợ, lo sợ","zht":"害怕、畏懼"},1,"ch8-r"],["솔깃하다",{"en":"tempted","zh":"动心、被吸引","th":"ถูกหลอกล่อใจ, สนใจขึ้นมา","ru":"быть заинтересованным","vi":"bị cám dỗ, hấp dẫn","zht":"動心、被吸引"},1,"ch8-r"],["폭넓다",{"en":"broad","zh":"广泛、范围广","th":"กว้างขวาง, หลากหลาย","ru":"быть широким, разносторонним","vi":"rộng rãi, bao quát","zht":"廣泛、範圍廣"},1,"ch8-r"],["가늘다",{"en":"thin","zh":"细、纤细","th":"เรียวเล็ก, บาง","ru":"быть тонким","vi":"mảnh, nhỏ, mịn","zht":"細、纖細"},1,"ch8-r"],["둥그렇다",{"en":"round","zh":"圆圆的","th":"กลม","ru":"быть круглым","vi":"tròn tròn","zht":"圓圓的"},0,"ch8-r"],["흥겹다",{"en":"merry","zh":"兴致勃勃、热闹欢快","th":"รื่นเริง, สนุกสนาน","ru":"быть весёлым, праздничным","vi":"vui vẻ, hân hoan, rộn ràng","zht":"興致勃勃、熱鬧歡快"},1,"ch8-r"],["차츰",{"en":"gradually","zh":"渐渐地","th":"ค่อย ๆ, ทีละน้อย","ru":"постепенно","vi":"dần dần","zht":"漸漸地"},0,"ch8-r"],["헤",{"en":"with the mouth wide open","zh":"张着嘴","th":"เสียงอ้าปากกว้างหัวเราะ/ยิ้มกว้าง","ru":"ухмыляясь, широко открыв рот","vi":"há miệng","zht":"張著嘴"},0,"ch8-r"]];          // [kr, {en,zh,zht,th,ru,vi}, star, sectionId]
+const SECTIONS = [{"id":"ch1-v","ch":"ch1","cls":"v"},{"id":"ch1-r","ch":"ch1","cls":"r"},{"id":"ch2-v","ch":"ch2","cls":"v"},{"id":"ch2-r","ch":"ch2","cls":"r"},{"id":"ch3-v","ch":"ch3","cls":"v"},{"id":"ch3-r","ch":"ch3","cls":"r"},{"id":"ch3-r2","ch":"ch3","cls":"r2"},{"id":"ch4-v","ch":"ch4","cls":"v"},{"id":"ch4-r","ch":"ch4","cls":"r"},{"id":"ch4-r2","ch":"ch4","cls":"r2"},{"id":"ch5-v","ch":"ch5","cls":"v"},{"id":"ch5-r","ch":"ch5","cls":"r"},{"id":"ch6-v","ch":"ch6","cls":"v"},{"id":"ch6-r","ch":"ch6","cls":"r"},{"id":"ch7-v","ch":"ch7","cls":"v"},{"id":"ch7-r","ch":"ch7","cls":"r"},{"id":"ch8-v","ch":"ch8","cls":"v"},{"id":"ch8-r","ch":"ch8","cls":"r"}];    // [{id, ch, cls}]
+const CHAPTERS = [{"id":"ch1","title":"1과","theme":""},{"id":"ch2","title":"2과","theme":""},{"id":"ch3","title":"3과","theme":""},{"id":"ch4","title":"4과","theme":""},{"id":"ch5","title":"5과","theme":"성격 · 심리 · 사무실"},{"id":"ch6","title":"6과","theme":"저출산 · 교육"},{"id":"ch7","title":"7과","theme":"호칭 · 몸짓언어"},{"id":"ch8","title":"8과","theme":"씨름 그림 · 묘사"}];    // [{id, title, theme}]
+const CLASSES = [{"sfx":"v","title":"비디오"},{"sfx":"r","title":"읽기·말하기"},{"sfx":"r2","title":"읽기·말하기 2"}];      // [{sfx, title}]
+const LANGS = [{"code":"en","native":"English"},{"code":"zh","native":"简体中文"},{"code":"zht","native":"繁體中文"},{"code":"th","native":"ไทย"},{"code":"ru","native":"Русский"},{"code":"vi","native":"Tiếng Việt"}];          // [{code, native}]
+const I18N = {
+  en:{tag:"Word Exorcist · shoot the part with the right word",lang:"Meaning language",chapters:"Chapters",classes:"Classes",star:"Priority words only",
+      words:"words",pick:"Pick at least 8 words",start:"Start",find:"Find",resume:"Resume",quit:"Quit",over:"Game over",score:"Score",kills:"Demons",
+      combo:"Best combo",acc:"Accuracy",missed:"Words to review",again:"Again",menu:"Menu",best:"Best",newBest:"New record!",sound:"Sound",noMiss:"No mistakes — perfect!",
+      how:"Every demon is made of <b>body parts with Korean words</b>. The <b>meaning</b> is shown at the top: shoot the part with the matching word.<br>Wrong part or too slow → the demon hits you ❤.<br>Break the limbs first — the <b>heart</b> is chained until then.<br>Keep a <b>streak</b> for bigger guns: 🔫 → 🎉 → ⚡ laser → 🚀 → 🌩. Answer fast for <b>CRIT</b>. Full ULT bar → 🔨 BONK!"},
+  zh:{tag:"单词驱魔师 · 打中写着正确单词的部位",lang:"意思的语言",chapters:"课",classes:"课型",star:"只看重点词",
+      words:"个词",pick:"至少选 8 个词",start:"开始",find:"找",resume:"继续",quit:"退出",over:"游戏结束",score:"分数",kills:"打倒的恶魔",
+      combo:"最高连击",acc:"正确率",missed:"要复习的单词",again:"再来",menu:"菜单",best:"最高分",newBest:"新纪录！",sound:"声音",noMiss:"没有错误——完美！",
+      how:"每个恶魔的<b>身体部位上都写着韩语单词</b>。上方显示<b>意思</b>：射中写着对应单词的部位。<br>打错或太慢 → 恶魔会攻击你 ❤。<br>先打掉四肢——在那之前<b>心脏</b>被锁住。<br>保持<b>连击</b>换更强的武器：🔫 → 🎉 → ⚡ 激光 → 🚀 → 🌩。答得快会<b>暴击</b>。ULT 满了 → 🔨 BONK！"},
+  th:{tag:"นักปราบผีคำศัพท์ · ยิงส่วนที่มีคำถูกต้อง",lang:"ภาษาของความหมาย",chapters:"บท",classes:"คาบเรียน",star:"เฉพาะคำสำคัญ",
+      words:"คำ",pick:"เลือกอย่างน้อย 8 คำ",start:"เริ่ม",find:"หา",resume:"เล่นต่อ",quit:"ออก",over:"จบเกม",score:"คะแนน",kills:"ปีศาจที่ปราบ",
+      combo:"คอมโบสูงสุด",acc:"ความแม่นยำ",missed:"คำที่ควรทบทวน",again:"เล่นอีกครั้ง",menu:"เมนู",best:"สถิติ",newBest:"สถิติใหม่!",sound:"เสียง",noMiss:"ไม่ผิดเลย — เยี่ยม!",
+      how:"ปีศาจแต่ละตัวมี<b>ส่วนต่างๆ ที่มีคำภาษาเกาหลี</b> ด้านบนจะแสดง<b>ความหมาย</b>: ยิงส่วนที่มีคำตรงกัน<br>ยิงผิดหรือช้าเกินไป → ปีศาจจะโจมตีคุณ ❤<br>ทำลายแขนขาก่อน — <b>หัวใจ</b>ถูกล่ามโซ่ไว้จนกว่าจะถึงตอนนั้น<br>รักษา<b>คอมโบ</b>เพื่อปืนที่แรงขึ้น: 🔫 → 🎉 → ⚡ เลเซอร์ → 🚀 → 🌩 ตอบเร็วได้ <b>CRIT</b> แถบ ULT เต็ม → 🔨 BONK!"},
+  ru:{tag:"Экзорцист слов · стреляй в часть с нужным словом",lang:"Язык значений",chapters:"Уроки",classes:"Занятия",star:"Только важные слова",
+      words:"слов",pick:"Выберите минимум 8 слов",start:"Начать",find:"Найди",resume:"Продолжить",quit:"Выйти",over:"Игра окончена",score:"Очки",kills:"Демоны",
+      combo:"Лучшее комбо",acc:"Точность",missed:"Слова для повторения",again:"Ещё раз",menu:"Меню",best:"Рекорд",newBest:"Новый рекорд!",sound:"Звук",noMiss:"Без ошибок — идеально!",
+      how:"Каждый демон состоит из <b>частей тела с корейскими словами</b>. Вверху показано <b>значение</b>: стреляй в часть с подходящим словом.<br>Не та часть или слишком медленно → демон бьёт тебя ❤.<br>Сначала отбей конечности — до этого <b>сердце</b> в цепях.<br>Держи <b>серию</b> ради оружия мощнее: 🔫 → 🎉 → ⚡ лазер → 🚀 → 🌩. Быстрый ответ = <b>КРИТ</b>. Полная шкала ULT → 🔨 BONK!"},
+  vi:{tag:"Thầy trừ tà từ vựng · bắn vào bộ phận có từ đúng",lang:"Ngôn ngữ nghĩa",chapters:"Bài",classes:"Lớp",star:"Chỉ từ quan trọng",
+      words:"từ",pick:"Chọn ít nhất 8 từ",start:"Bắt đầu",find:"Tìm",resume:"Tiếp tục",quit:"Thoát",over:"Kết thúc",score:"Điểm",kills:"Quỷ đã diệt",
+      combo:"Combo cao nhất",acc:"Độ chính xác",missed:"Từ cần ôn lại",again:"Chơi lại",menu:"Menu",best:"Kỷ lục",newBest:"Kỷ lục mới!",sound:"Âm thanh",noMiss:"Không sai câu nào — hoàn hảo!",
+      how:"Mỗi con quỷ gồm <b>các bộ phận mang từ tiếng Hàn</b>. Phía trên hiện <b>nghĩa</b>: bắn vào bộ phận có từ tương ứng.<br>Bắn sai hoặc quá chậm → quỷ đánh bạn ❤.<br>Phá tay chân trước — đến lúc đó <b>trái tim</b> mới hết bị xích.<br>Giữ <b>chuỗi</b> để có súng mạnh hơn: 🔫 → 🎉 → ⚡ laser → 🚀 → 🌩. Trả lời nhanh = <b>CRIT</b>. Thanh ULT đầy → 🔨 BONK!"},
+};
+I18N.zht = {tag:"單詞驅魔師 · 打中寫著正確單詞的部位",lang:"意思的語言",chapters:"課",classes:"課型",star:"只看重點詞",
+      words:"個詞",pick:"至少選 8 個詞",start:"開始",find:"找",resume:"繼續",quit:"退出",over:"遊戲結束",score:"分數",kills:"打倒的惡魔",
+      combo:"最高連擊",acc:"正確率",missed:"要複習的單詞",again:"再來",menu:"選單",best:"最高分",newBest:"新紀錄！",sound:"聲音",noMiss:"沒有錯誤——完美！",
+      how:"每個惡魔的<b>身體部位上都寫著韓語單詞</b>。上方顯示<b>意思</b>：射中寫著對應單詞的部位。<br>打錯或太慢 → 惡魔會攻擊你 ❤。<br>先打掉四肢——在那之前<b>心臟</b>被鎖住。<br>保持<b>連擊</b>換更強的武器：🔫 → 🎉 → ⚡ 雷射 → 🚀 → 🌩。答得快會<b>暴擊</b>。ULT 滿了 → 🔨 BONK！"};
+
+/* ============================== helpers ============================== */
+const $ = s => document.querySelector(s);
+const store = { get(k){try{return localStorage.getItem(k);}catch(e){return null;}}, set(k,v){try{localStorage.setItem(k,v);}catch(e){}} };
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+let lang = LANGS.some(l => l.code === store.get("k5b_lang")) ? store.get("k5b_lang") : "en";
+const T = k => (I18N[lang] && I18N[lang][k]) || I18N.en[k];
+const meaning = i => CARDS[i][1][lang] || CARDS[i][1].en;
+const FONT = '"Jua","Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR","Leelawadee UI","Microsoft YaHei",sans-serif';
+
+/* ============================== sound (tiny synth, no files) ============================== */
+let AC = null, muted = store.get("k5b_demon_mute") === "1";
+function ac(){ if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} } if (AC && AC.state === "suspended") AC.resume(); return AC; }
+function tone(f, dur, type = "square", vol = .12, slide = 0, delay = 0){
+  const a = ac(); if (!a || muted) return; const t = a.currentTime + delay;
+  const o = a.createOscillator(), g = a.createGain(); o.type = type; o.frequency.setValueAtTime(f, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur); o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .02);
+}
+function noise(dur, vol = .3, lp = 1200, delay = 0){
+  const a = ac(); if (!a || muted) return; const t = a.currentTime + delay;
+  const b = a.createBuffer(1, Math.floor(a.sampleRate * dur), a.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain(); s.buffer = b; f.type = "lowpass"; f.frequency.value = lp;
+  g.gain.value = vol; s.connect(f).connect(g).connect(a.destination); s.start(t);
+}
+const SFX = {
+  pew(){ tone(900, .09, "square", .07, -500); },
+  shot(){ noise(.18, .35, 3000); tone(300, .1, "square", .06, -150); },
+  laser(){ tone(1400, .25, "sawtooth", .06, -1100); },
+  rocket(){ noise(.35, .12, 600); tone(200, .3, "sawtooth", .04, 300); },
+  thunder(){ noise(.6, .45, 2500); tone(80, .5, "sawtooth", .08, -40); },
+  hit(){ tone(220, .08, "square", .1, -120); noise(.07, .2, 2000); },
+  crit(){ tone(1046, .12, "triangle", .1); tone(1568, .18, "triangle", .08, 0, .06); },
+  brk(){ noise(.3, .5, 900); tone(160, .25, "square", .1, -110); },
+  boom(){ noise(.9, .7, 500); tone(60, .7, "sine", .25, -30); },
+  coin(){ tone(1319, .07, "square", .05); tone(1760, .12, "square", .05, 0, .07); },
+  hurt(){ tone(180, .35, "sawtooth", .14, -120); noise(.25, .3, 700); },
+  wrong(){ tone(330, .12, "square", .08); tone(220, .2, "square", .08, 0, .12); },
+  upgrade(){ [523, 659, 784, 1046].forEach((f, i) => tone(f, .15, "triangle", .09, 0, i * .07)); },
+  land(){ noise(.3, .4, 300); tone(90, .25, "sine", .2, -40); },
+  bonk(){ tone(120, .4, "square", .2, -80); noise(.5, .6, 800); tone(900, .15, "triangle", .1, 400, .05); },
+  unlock(){ tone(700, .1, "triangle", .1); tone(1050, .2, "triangle", .1, 0, .08); },
+};
+
+/* ============================== game definitions ============================== */
+// part geometry in demon-local units (demon ≈ 300 wide at scale 1). r = hit circle, bx/by = word sticker.
+const PARTS = {
+  head:{ lx:0,    ly:-95, r:56, bx:0,    by:-178 },
+  armL:{ lx:-128, ly:30,  r:42, bx:-152, by:86 },
+  armR:{ lx:128,  ly:30,  r:42, bx:152,  by:86 },
+  wingL:{lx:-142, ly:-95, r:46, bx:-152, by:-150 },
+  wingR:{lx:142,  ly:-95, r:46, bx:152,  by:-150 },
+  core:{ lx:0,    ly:40,  r:40, bx:0,    by:40 },
+};
+const WISP_SPOTS = [{ bx:-160, by:170 }, { bx:160, by:170 }, { bx:0, by:210 }];
+const KINDS = {
+  imp:  { name:"꼬마 도깨비", parts:["head","core"], hp:1, scale:.82, rage:10, body:"#ff6b6b", dark:"#a52a2a", belly:"#ffb3a7", score:120 },
+  devil:{ name:"악마",       parts:["head","armL","armR","core"], hp:2, scale:1, rage:9.5, body:"#9b6bff", dark:"#4b2a9e", belly:"#d5c2ff", score:300 },
+  bat:  { name:"박쥐 마왕",   parts:["head","wingL","wingR","core"], hp:2, scale:.96, rage:9, body:"#2ec4a0", dark:"#12705a", belly:"#b4f2e2", score:350 },
+  boss: { name:"대마왕",      parts:["head","wingL","wingR","armL","armR","core"], hp:3, scale:1.04, rage:8.5, body:"#ff8c1a", dark:"#9e4a00", belly:"#ffd9a8", score:1200, boss:true },
+};
+// the gun upgrades with the streak; one mistake drops you back to the popgun
+const WEAPONS = [
+  { at:0,  id:"pop",     name:"뿅총",       en:"Popgun",           icon:"🔫", dmg:1, color:"#ffd23f" },
+  { at:3,  id:"confetti",name:"꽃가루 샷건", en:"Confetti shotgun", icon:"🎉", dmg:2, color:"#ff5fa2" },
+  { at:6,  id:"laser",   name:"레이저",     en:"Laser (+pierce)",  icon:"⚡", dmg:2, color:"#3ee6ff" },
+  { at:10, id:"rocket",  name:"로켓",       en:"Rocket (+splash)", icon:"🚀", dmg:3, color:"#ff7a1a" },
+  { at:15, id:"thunder", name:"천둥",       en:"Thunder (+chain)", icon:"🌩", dmg:3, color:"#b388ff" },
+];
+const ULT_MAX = 8;
+const CHEERS = [[5,"대박!"],[8,"미쳤다!"],[12,"레전드!"],[20,"신이다!!"],[30,"퇴마 장인!!"]];   // not on weapon steps (3/6/10/15)
+
+/* ============================== canvas ============================== */
+const cv = $("#cv"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+function resize(){ DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); layout(); }
+let L = { S:1, ex:0, ey:0, gunX:0, gunY:0, topH:0 };
+function layout(){
+  const top = 150, bottom = 128;
+  const avail = Math.max(260, H - top - bottom);
+  const S = clamp(Math.min((W - 12) / 470, avail / 430), .5, 1.3);
+  L = { S, ex: W / 2, ey: top + avail / 2 - 10 * S, gunX: W / 2, gunY: H - 58, topH: top };
+}
+addEventListener("resize", resize);
+
+/* ============================== state ============================== */
+let G = null;                 // one run
+let pool = [];                // card indices in play
+let last = performance.now();
+const FX = { particles:[], texts:[], debris:[], shots:[], beams:[], bolts:[], rings:[], slashes:0, flash:null, shake:0 };
+let embers = [];
+
+function resetFX(){ FX.particles = []; FX.texts = []; FX.debris = []; FX.shots = []; FX.beams = []; FX.bolts = []; FX.rings = []; FX.slashes = 0; FX.flash = null; FX.shake = 0; }
+
+function startGame(){
+  pool = selectedPool();
+  if (pool.length < 8) return;
+  resetFX();
+  G = { hearts:5, maxHearts:5, score:0, shownScore:0, kills:0, combo:0, bestCombo:0, ult:0, correct:0, wrong:0,
+        enemy:null, round:null, lock:false, reveal:null, hitstop:0, timeScale:1, slowT:0, roundNo:0,
+        bag:[], retry:[], recent:[], missed:new Map(), banner:null, gunKick:0, gunAng:-Math.PI/2, paused:false, over:false,
+        hammer:null, weaponIdx:0, cheerAt:0, scorePop:0, heartPop:0 };
+  $("#menu").hidden = true; $("#over").hidden = true; $("#pauseBtn").hidden = false;
+  ac(); spawnEnemy();
+}
+
+/* ---------- words ---------- */
+function nextWord(){
+  const due = G.retry.findIndex(r => r.due <= G.roundNo);
+  if (due >= 0) { const r = G.retry.splice(due, 1)[0]; if (!G.recent.includes(r.i)) return r.i; }
+  for (let tries = 0; tries < 20; tries++) {
+    if (!G.bag.length) G.bag = shuffle(pool.slice());
+    const i = G.bag.pop();
+    if (!G.recent.includes(i) || pool.length < 6) return i;
+  }
+  return pick(pool);
+}
+function distractors(ans, n){
+  const out = [], sec = CARDS[ans][3], m = meaning(ans), kr = CARDS[ans][0];
+  const same = pool.filter(i => CARDS[i][3] === sec);
+  const tryFrom = src => { for (const i of shuffle(src.slice())) { if (out.length >= n) break;
+    if (i === ans || CARDS[i][0] === kr || meaning(i) === m || out.some(o => CARDS[o][0] === CARDS[i][0])) continue; out.push(i); } };
+  if (same.length > n + 2 && Math.random() < .6) tryFrom(same);
+  tryFrom(pool);
+  if (out.length < n) tryFrom(CARDS.map((_, i) => i));
+  return out;
+}
+
+/* ---------- enemies ---------- */
+function kindFor(k){
+  if (k % 5 === 4) return "boss";
+  if (k < 2) return k === 0 ? "imp" : "devil";
+  const r = Math.random();
+  return r < .25 ? "imp" : r < .62 ? "devil" : "bat";
+}
+function spawnEnemy(){
+  const kind = kindFor(G.kills), K = KINDS[kind];
+  const hp = K.hp + (G.kills >= 10 && kind !== "imp" ? 1 : 0);
+  const parts = K.parts.map(id => ({ id, ...PARTS[id], hp, max:hp, alive:true, shield: id === "core", flash:0, word:null, rect:null }));
+  if (parts.length === 1) parts[0].shield = false;
+  G.enemy = { kind, K, parts, wisps:[], enterT:0, bob:Math.random() * 6, lunge:0, hurt:0, blink:0, rage:0,
+              rageMax: Math.max(5.5, K.rage - Math.min(2.5, G.kills * .08)), dying:0, dead:false, yOff:-H };
+  G.round = null; G.lock = true;
+  if (K.boss) banner("BOSS! " + K.name, "#ff4f6d");
+}
+function targetable(){ return G.enemy.parts.filter(p => p.alive && !p.shield); }
+function updateShields(){
+  const E = G.enemy, core = E.parts.find(p => p.id === "core");
+  if (core && core.shield && !E.parts.some(p => p.alive && p.id !== "core")) {
+    core.shield = false;
+    const c = partWorld(core); burst(c.x, c.y, 26, ["#ffd23f", "#fff", "#aaa"], 7, "spark");
+    floatText(c.x, c.y - 40, "심장 노출!", "#ffd23f", 30); SFX.unlock();
+  }
+}
+
+/* ---------- rounds ---------- */
+function newRound(){
+  const E = G.enemy; if (!E || E.dead) return;
+  G.roundNo++;
+  const targets = targetable();
+  const ans = nextWord();
+  G.recent.push(ans); if (G.recent.length > 4) G.recent.shift();
+  const need = Math.max(0, 3 - targets.length);
+  E.wisps = WISP_SPOTS.slice(0, need).map((s, i) => ({ ...s, alive:true, word:null, rect:null, ph:i * 2.1 }));
+  const slots = [...targets, ...E.wisps];
+  const correct = pick(targets);
+  const ds = distractors(ans, slots.length - 1);
+  E.parts.forEach(p => p.word = null);
+  let k = 0;
+  for (const s of slots) s.word = s === correct ? ans : (ds[k++] ?? pick(pool));
+  G.round = { ans, correct, t0: performance.now() };
+  E.rage = 0; G.lock = false; G.reveal = null;
+}
+
+/* ============================== input ============================== */
+cv.addEventListener("pointerdown", e => {
+  if (!G || G.paused || G.over) return;
+  ac();
+  const x = e.clientX, y = e.clientY;
+  // ULT button
+  if (Math.hypot(x - (W - 52), y - (H - 58)) < 40) { useUlt(); return; }
+  if (G.lock || !G.round) return;
+  const E = G.enemy;
+  const slots = [...targetable(), ...E.wisps.filter(w => w.alive)];
+  let hit = slots.find(s => s.rect && x >= s.rect.x && x <= s.rect.x + s.rect.w && y >= s.rect.y && y <= s.rect.y + s.rect.h);
+  if (!hit) hit = targetable().find(p => { const c = partWorld(p); return Math.hypot(x - c.x, y - c.y) < p.r * L.S; });
+  if (!hit) {
+    const core = E.parts.find(p => p.id === "core" && p.alive && p.shield);
+    if (core) { const c = partWorld(core); if (Math.hypot(x - c.x, y - c.y) < core.r * L.S) { floatText(c.x, c.y, "🔒", "#fff", 30); tone(200, .08, "square", .05); } }
+    return;
+  }
+  G.lock = true;
+  fire(hit);
+});
+addEventListener("keydown", e => {
+  if (!G || G.over) return;
+  if (e.key === "Escape" || e.key === "p") togglePause();
+  else if (e.key === " ") { e.preventDefault(); useUlt(); }
+});
+
+/* ============================== weapons ============================== */
+const weapon = () => WEAPONS[G.weaponIdx];
+function slotWorld(s){ return s.rect ? { x: s.rect.x + s.rect.w / 2, y: s.rect.y + s.rect.h / 2 } : partWorld(s); }
+function fire(slot){
+  const w = weapon();
+  const aim = slot.id ? partWorld(slot) : slotWorld(slot);
+  const gx = L.gunX, gy = L.gunY - 26;
+  G.gunAng = Math.atan2(aim.y - gy, aim.x - gx); G.gunKick = 1;
+  const done = () => resolve(slot);
+  if (w.id === "pop") { SFX.pew(); FX.shots.push({ type:"star", x:gx, y:gy, tx:aim.x, ty:aim.y, sp:1500, cb:done, trail:[] }); }
+  else if (w.id === "confetti") {
+    SFX.shot();
+    for (let i = 0; i < 6; i++) FX.shots.push({ type:"pellet", x:gx, y:gy, tx:aim.x + rnd(-30, 30), ty:aim.y + rnd(-30, 30), sp:rnd(1300, 1700), cb: i === 0 ? done : null, trail:[], col: pick(["#ff5fa2","#ffd23f","#3ee6a8","#3ee6ff","#b388ff"]) });
+  }
+  else if (w.id === "laser") { SFX.laser(); FX.beams.push({ x1:gx, y1:gy, x2:aim.x, y2:aim.y, life:.35, max:.35, col:"#3ee6ff" }); setTimeout(done, 70); }
+  else if (w.id === "rocket") { SFX.rocket(); FX.shots.push({ type:"rocket", x:gx, y:gy, sx:gx, sy:gy, tx:aim.x, ty:aim.y, sp:1000, cb:done, trail:[], bend:rnd(-120, 120) }); }
+  else if (w.id === "thunder") {
+    SFX.thunder(); FX.flash = { col:"#e6dcff", a:.35 };
+    FX.bolts.push({ pts: boltPts(aim.x + rnd(-40, 40), -20, aim.x, aim.y), life:.45, max:.45, col:"#d6c2ff" });
+    setTimeout(done, 90);
+  }
+}
+function boltPts(x1, y1, x2, y2){
+  const pts = [[x1, y1]], n = 9;
+  for (let i = 1; i < n; i++) { const t = i / n; pts.push([x1 + (x2 - x1) * t + rnd(-26, 26), y1 + (y2 - y1) * t + rnd(-10, 10)]); }
+  pts.push([x2, y2]); return pts;
+}
+
+/* ============================== resolve a shot ============================== */
+function resolve(slot){
+  const E = G.enemy, R = G.round; if (!E || !R || E.dead) return;
+  const now = performance.now();
+  if (slot === R.correct) {
+    const secs = (now - R.t0) / 1000, crit = secs < 2.5;
+    const w = weapon();
+    let dmg = w.dmg + (crit ? 1 : 0);
+    G.combo++; G.correct++; G.bestCombo = Math.max(G.bestCombo, G.combo); G.ult = Math.min(ULT_MAX, G.ult + 1);
+    const gain = Math.round((100 + G.combo * 15) * (crit ? 1.5 : 1)); G.score += gain; G.scorePop = 1;
+    const c = partWorld(slot);
+    impactFX(w, c.x, c.y, crit);
+    if (crit) { floatText(c.x + 30, c.y - 60, "CRIT!", "#ffd23f", 34); SFX.crit(); }
+    floatText(c.x - 20, c.y - 30, "+" + gain, "#fff", 22);
+    damage(slot, dmg);
+    // weapon perks: laser pierces, rocket splashes, thunder chains
+    const others = () => targetable().filter(p => p !== slot && p.alive);
+    if (w.id === "laser") { const o = others(); if (o.length) { const p = pick(o), pc = partWorld(p); FX.beams.push({ x1:c.x, y1:c.y, x2:pc.x, y2:pc.y, life:.3, max:.3, col:"#3ee6ff" }); damage(p, 1); } }
+    if (w.id === "rocket") { for (const p of others()) damage(p, 1); FX.rings.push({ x:c.x, y:c.y, r:10, max:260 * L.S, life:.5, maxL:.5, col:"#ff7a1a" }); }
+    if (w.id === "thunder") { const o = shuffle(others()).slice(0, 2); let from = c; for (const p of o) { const pc = partWorld(p); FX.bolts.push({ pts:boltPts(from.x, from.y, pc.x, pc.y), life:.35, max:.35, col:"#d6c2ff" }); damage(p, 1); from = pc; } }
+    upgradeCheck(); cheer();
+    updateShields();
+    G.recordRight = (G.recordRight || 0) + 1;
+    if (E.parts.every(p => !p.alive)) killEnemy();
+    else setTimeout(() => { if (G && !G.over && G.enemy === E) newRound(); }, 520);
+  } else {
+    // wrong: show what you actually hit, the demon strikes back, the right answer lights up
+    const c = slotWorld(slot);
+    if (slot.word != null) floatText(c.x, c.y - 44, CARDS[slot.word][0] + " = " + meaning(slot.word), "#ffb3c0", 18, 2.2);
+    if (!slot.id) { slot.alive = false; burst(c.x, c.y, 16, ["#e8dcff", "#fff"], 4, "circle"); }
+    SFX.wrong(); G.wrong++;
+    miss(R.ans);
+    setTimeout(() => enemyAttack(), 250);
+  }
+}
+function miss(i){ G.missed.set(i, (G.missed.get(i) || 0) + 1); G.retry.push({ i, due: G.roundNo + 3 }); }
+function damage(p, dmg){
+  if (!p.alive) return;
+  p.hp -= dmg; p.flash = .14; G.enemy.hurt = 1;
+  const c = partWorld(p);
+  floatText(c.x + rnd(-20, 20), c.y + rnd(-10, 10), "-" + dmg, "#ff4f6d", 26 + dmg * 4);
+  G.hitstop = Math.max(G.hitstop, .05 + dmg * .015); FX.shake = Math.max(FX.shake, 6 + dmg * 3);
+  if (p.hp <= 0) {
+    p.alive = false;
+    const K = G.enemy.K;
+    FX.debris.push({ part:p, kind:G.enemy.kind, x:c.x, y:c.y, vx:rnd(-260, 260), vy:rnd(-620, -420), rot:0, vr:rnd(-9, 9), life:1.6 });
+    burst(c.x, c.y, 34, [K.body, K.dark, "#fff", "#ffd23f"], 9, "circle");
+    burst(c.x, c.y, 10, ["#fff"], 6, "star");
+    FX.rings.push({ x:c.x, y:c.y, r:10, max:120 * L.S, life:.35, maxL:.35, col:"#fff" });
+    floatText(c.x, c.y - 20, pick(["팡!", "퍽!", "쾅!", "뿅!"]), "#fff", 40);
+    G.hitstop = .12; FX.shake = 16; SFX.brk();
+  } else SFX.hit();
+}
+function impactFX(w, x, y, crit){
+  const n = crit ? 1.6 : 1;
+  if (w.id === "pop") burst(x, y, 14 * n, ["#ffd23f", "#fff"], 6, "star");
+  else if (w.id === "confetti") burst(x, y, 40 * n, ["#ff5fa2","#ffd23f","#3ee6a8","#3ee6ff","#b388ff"], 8, "confetti");
+  else if (w.id === "laser") { burst(x, y, 24 * n, ["#3ee6ff", "#fff"], 7, "spark"); FX.rings.push({ x, y, r:8, max:90 * L.S, life:.3, maxL:.3, col:"#3ee6ff" }); }
+  else if (w.id === "rocket") { burst(x, y, 60 * n, ["#ff7a1a","#ffd23f","#ff4f6d","#555"], 11, "circle"); FX.flash = { col:"#ffcf8a", a:.35 }; SFX.boom(); }
+  else if (w.id === "thunder") { burst(x, y, 40 * n, ["#d6c2ff","#fff","#b388ff"], 10, "spark"); }
+}
+function upgradeCheck(){
+  let idx = 0; WEAPONS.forEach((w, i) => { if (G.combo >= w.at) idx = i; });
+  if (idx > G.weaponIdx) { G.weaponIdx = idx; const w = WEAPONS[idx]; banner(w.icon + " " + w.name + "!", w.color, w.en); SFX.upgrade(); }
+}
+function cheer(){
+  for (const [n, txt] of CHEERS) if (G.combo === n) { banner(txt, "#ffd23f", G.combo + " COMBO"); break; }
+}
+function enemyAttack(){
+  const E = G.enemy; if (!E || E.dead || G.over) return;
+  E.lunge = 1; FX.slashes = .5; FX.flash = { col:"#ff2a4a", a:.45 }; FX.shake = 24; SFX.hurt();
+  G.hearts--; G.heartPop = 1;
+  const lost = G.combo; G.combo = 0; G.weaponIdx = 0;
+  if (lost >= 3) floatText(W / 2, H * .62, "COMBO " + lost + " ✗", "#ff8fa3", 26);
+  G.reveal = { slot: G.round && G.round.correct, until: performance.now() + 1700 };
+  G.lock = true;
+  if (G.hearts <= 0) { setTimeout(gameOver, 1500); return; }
+  setTimeout(() => { if (G && !G.over && G.enemy === E && !E.dead) newRound(); }, 1800);
+}
+function killEnemy(){
+  const E = G.enemy; E.dead = true; E.dying = 1; G.round = null; G.lock = true;
+  const x = L.ex, y = L.ey;
+  G.timeScale = .3; G.slowT = .7;
+  FX.flash = { col:"#fff", a:.7 }; FX.shake = 30; SFX.boom();
+  burst(x, y, 120, [E.K.body, E.K.dark, "#ffd23f", "#fff", "#ff4f6d"], 14, "circle");
+  burst(x, y, 40, ["#ffd23f"], 10, "star");
+  for (let i = 0; i < 3; i++) FX.rings.push({ x, y, r:10, max:(200 + i * 120) * L.S, life:.5 + i * .15, maxL:.5 + i * .15, col: i ? "#ffd23f" : "#fff" });
+  const coins = 14 + (E.K.boss ? 20 : 0);
+  for (let i = 0; i < coins; i++) FX.particles.push({ x, y, vx:rnd(-380, 380), vy:rnd(-820, -300), g:900, life:rnd(1.2, 1.8), max:1.8, size:rnd(9, 13), col:"#ffd23f", shape:"coin", rot:0, vr:rnd(-8, 8), home:true });
+  const gain = E.K.score + G.combo * 20; G.score += gain; G.scorePop = 1;
+  floatText(x, y - 90, "퇴마 성공!", "#ffd23f", 46, 1.6);
+  floatText(x, y - 40, "+" + gain, "#fff", 30, 1.6);
+  G.kills++;
+  if (E.K.boss && G.hearts < G.maxHearts) { G.hearts++; G.heartPop = 1; floatText(x, y + 10, "❤ +1", "#ff4f6d", 34, 1.6); }
+  setTimeout(() => { for (let i = 0; i < 6; i++) setTimeout(() => SFX.coin(), i * 70); }, 400);
+  setTimeout(() => { if (G && !G.over) spawnEnemy(); }, 1700);
+}
+function useUlt(){
+  if (!G || G.lock || G.ult < ULT_MAX || !G.enemy || G.enemy.dead || G.hammer) return;
+  G.ult = 0; G.lock = true; G.hammer = { t:0 };
+}
+function hammerImpact(){
+  const E = G.enemy; SFX.bonk(); FX.shake = 36; FX.flash = { col:"#fff3b0", a:.6 };
+  floatText(L.ex, L.ey - 120 * L.S, "BONK!!", "#ffd23f", 64, 1.4);
+  burst(L.ex, L.ey - 40 * L.S, 70, ["#ffd23f", "#fff", "#ff8c1a"], 12, "star");
+  FX.rings.push({ x:L.ex, y:L.ey, r:10, max:320 * L.S, life:.5, maxL:.5, col:"#ffd23f" });
+  for (const p of targetable()) damage(p, 2);
+  updateShields();
+  if (E.parts.every(p => !p.alive)) killEnemy();
+  else setTimeout(() => { if (G && !G.over && G.enemy === E) newRound(); }, 600);
+}
+function gameOver(){
+  if (!G || G.over) return;
+  G.over = true; $("#pauseBtn").hidden = true;
+  const best = +(store.get("k5b_demon_best") || 0), isBest = G.score > best;
+  if (isBest) store.set("k5b_demon_best", G.score);
+  $("#sScore").textContent = G.score; $("#sKills").textContent = G.kills; $("#sCombo").textContent = G.bestCombo;
+  const tot = G.correct + G.wrong; $("#sAcc").textContent = tot ? Math.round(G.correct / tot * 100) + "%" : "–";
+  $("#newBest").textContent = isBest ? "🏆 " + T("newBest") : T("best") + ": " + best;
+  const list = [...G.missed.entries()].sort((a, b) => b[1] - a[1]);
+  $("#missedList").innerHTML = list.length ? list.map(([i, n]) => `<div><b>${esc(CARDS[i][0])}</b><span class="m">${esc(meaning(i))}</span>${n > 1 ? " ×" + n : ""}</div>`).join("") : `<div>${esc(T("noMiss"))}</div>`;
+  setTimeout(() => { $("#over").hidden = false; }, 300);
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+
+/* ============================== FX helpers ============================== */
+function burst(x, y, n, cols, spd, shape){
+  for (let i = 0; i < n; i++) {
+    const a = rnd(0, Math.PI * 2), v = rnd(.3, 1) * spd * 60;
+    FX.particles.push({ x, y, vx:Math.cos(a) * v, vy:Math.sin(a) * v - 80, g: shape === "spark" ? 0 : 700, life:rnd(.4, .9), max:.9,
+      size: shape === "confetti" ? rnd(6, 11) : rnd(3, 8), col:pick(cols), shape, rot:rnd(0, 6), vr:rnd(-12, 12) });
+  }
+}
+function floatText(x, y, text, col, size, life = 1){ FX.texts.push({ x, y, text, col, size, life, max:life }); }
+function banner(text, col, sub){ G.banner = { text, col, sub, life:1.6, max:1.6 }; }
+function partWorld(p){
+  const E = G.enemy, S = L.S * E.K.scale;
+  return { x: L.ex + p.lx * S, y: L.ey + E.yOff + bobY(E) + p.ly * S };
+}
+const bobY = E => Math.sin(E.bob * 2) * 6 * L.S - E.lunge * 30 * L.S;
+
+/* ============================== update ============================== */
+function update(dt, rdt){
+  // background embers run always
+  if (embers.length < 40) embers.push({ x:rnd(0, W), y:H + 10, vy:rnd(20, 60), vx:rnd(-10, 10), s:rnd(1.5, 3.5), a:rnd(.3, .8) });
+  embers.forEach(e => { e.y -= e.vy * rdt; e.x += e.vx * rdt; }); embers = embers.filter(e => e.y > -10);
+  if (!G) return;
+  if (G.slowT > 0) { G.slowT -= rdt; if (G.slowT <= 0) G.timeScale = 1; }
+  const E = G.enemy;
+  if (E) {
+    E.bob += dt; E.lunge = Math.max(0, E.lunge - dt * 3); E.hurt = Math.max(0, E.hurt - dt * 4);
+    E.blink -= dt; if (E.blink < -3) E.blink = .12;
+    E.parts.forEach(p => p.flash = Math.max(0, p.flash - dt));
+    if (E.yOff < 0) { E.enterT += dt; E.yOff = Math.min(0, -H + E.enterT * E.enterT * 2600);
+      if (E.yOff >= 0) { FX.shake = 14; SFX.land(); burst(L.ex, L.ey + 140 * L.S, 24, ["#8a6bb8", "#5d3f8a"], 6, "circle"); setTimeout(() => { if (G && G.enemy === E) newRound(); }, 350); } }
+    if (G.round && !G.lock && !G.paused) {
+      E.rage += dt;
+      if (E.rage >= E.rageMax) { G.lock = true; miss(G.round.ans); G.wrong++; enemyAttack(); }
+    }
+  }
+  if (G.hammer) { G.hammer.t += dt; if (!G.hammer.hit && G.hammer.t > .35) { G.hammer.hit = true; hammerImpact(); } if (G.hammer.t > .9) G.hammer = null; }
+  G.gunKick = Math.max(0, G.gunKick - dt * 6);
+  G.scorePop = Math.max(0, G.scorePop - dt * 4); G.heartPop = Math.max(0, G.heartPop - dt * 3);
+  G.shownScore += (G.score - G.shownScore) * Math.min(1, dt * 8);
+  if (G.banner) { G.banner.life -= rdt; if (G.banner.life <= 0) G.banner = null; }
+  // projectiles
+  for (const s of FX.shots) {
+    s.trail.push([s.x, s.y]); if (s.trail.length > 10) s.trail.shift();
+    const dx = s.tx - s.x, dy = s.ty - s.y, d = Math.hypot(dx, dy), step = s.sp * dt;
+    if (s.type === "rocket") {
+      s.t = (s.t || 0) + dt * s.sp / Math.max(1, Math.hypot(s.tx - s.sx, s.ty - s.sy));
+      const t = Math.min(1, s.t), mx = (s.sx + s.tx) / 2 + s.bend, my = (s.sy + s.ty) / 2 - 80;
+      s.x = (1 - t) * (1 - t) * s.sx + 2 * (1 - t) * t * mx + t * t * s.tx; s.y = (1 - t) * (1 - t) * s.sy + 2 * (1 - t) * t * my + t * t * s.ty;
+      FX.particles.push({ x:s.x, y:s.y, vx:rnd(-20, 20), vy:rnd(-20, 20), g:-40, life:.5, max:.5, size:rnd(5, 9), col:"rgba(200,200,210,.7)", shape:"smoke" });
+      if (t >= 1) { s.done = true; s.cb && s.cb(); }
+    } else if (d <= step) { s.done = true; s.cb && s.cb(); }
+    else { s.x += dx / d * step; s.y += dy / d * step; }
+  }
+  FX.shots = FX.shots.filter(s => !s.done);
+  FX.beams.forEach(b => b.life -= rdt); FX.beams = FX.beams.filter(b => b.life > 0);
+  FX.bolts.forEach(b => b.life -= rdt); FX.bolts = FX.bolts.filter(b => b.life > 0);
+  FX.rings.forEach(r => { r.life -= rdt; r.r += (r.max - r.r) * Math.min(1, rdt * 10); }); FX.rings = FX.rings.filter(r => r.life > 0);
+  for (const p of FX.particles) {
+    p.life -= dt;
+    if (p.home && p.life < .7) { const tx = W - 70, ty = 24; p.x += (tx - p.x) * Math.min(1, dt * 7); p.y += (ty - p.y) * Math.min(1, dt * 7); }
+    else { p.vy += (p.g || 0) * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .985; }
+    p.rot = (p.rot || 0) + (p.vr || 0) * dt;
+  }
+  FX.particles = FX.particles.filter(p => p.life > 0);
+  if (FX.particles.length > 700) FX.particles.splice(0, FX.particles.length - 700);
+  FX.texts.forEach(t => { t.life -= rdt; t.y -= 40 * rdt; }); FX.texts = FX.texts.filter(t => t.life > 0);
+  FX.debris.forEach(d => { d.life -= dt; d.vy += 1500 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.rot += d.vr * dt; }); FX.debris = FX.debris.filter(d => d.life > 0 && d.y < H + 200);
+  FX.slashes = Math.max(0, FX.slashes - rdt);
+  if (FX.flash) { FX.flash.a -= rdt * 2.2; if (FX.flash.a <= 0) FX.flash = null; }
+  FX.shake = Math.max(0, FX.shake - rdt * 60);
+}
+
+/* ============================== drawing ============================== */
+function rr(x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function drawBG(){
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#1a0b2e"); g.addColorStop(.6, "#3a0f3f"); g.addColorStop(1, "#5c1426");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // big moon
+  ctx.fillStyle = "rgba(255,210,120,.10)"; ctx.beginPath(); ctx.arc(W * .82, H * .2, 90, 0, 7); ctx.fill();
+  ctx.fillStyle = "rgba(255,210,120,.16)"; ctx.beginPath(); ctx.arc(W * .82, H * .2, 55, 0, 7); ctx.fill();
+  // spooky hills
+  ctx.fillStyle = "#240a2c";
+  ctx.beginPath(); ctx.moveTo(0, H); for (let x = 0; x <= W + 40; x += 40) ctx.lineTo(x, H - 150 - Math.sin(x * .02) * 25 - Math.sin(x * .007) * 30); ctx.lineTo(W, H); ctx.fill();
+  ctx.fillStyle = "#16061c"; ctx.fillRect(0, H - 100, W, 100);
+  const lava = ctx.createLinearGradient(0, H - 110, 0, H - 90); lava.addColorStop(0, "rgba(255,90,40,.0)"); lava.addColorStop(1, "rgba(255,90,40,.35)");
+  ctx.fillStyle = lava; ctx.fillRect(0, H - 110, W, 20);
+  for (const e of embers) { ctx.fillStyle = `rgba(255,${120 + (e.s * 30) | 0},60,${e.a})`; ctx.beginPath(); ctx.arc(e.x, e.y, e.s, 0, 7); ctx.fill(); }
+}
+
+// ---- the demon: every part drawn in local units so the same code draws it attached or flying away as debris
+function drawPartShape(id, K, white){
+  const body = white ? "#fff" : K.body, dark = white ? "#fff" : K.dark;
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  if (id === "wingL" || id === "wingR") {
+    const s = id === "wingL" ? -1 : 1;
+    ctx.beginPath(); ctx.moveTo(s * 55, -55); ctx.lineTo(s * 190, -160); ctx.lineTo(s * 170, -110); ctx.lineTo(s * 200, -80);
+    ctx.lineTo(s * 160, -60); ctx.lineTo(s * 172, -25); ctx.lineTo(s * 120, -40); ctx.lineTo(s * 70, -15); ctx.closePath();
+    ctx.fillStyle = dark; ctx.fill(); ctx.lineWidth = 6; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+    ctx.strokeStyle = white ? "#fff" : "rgba(255,255,255,.25)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(s * 70, -45); ctx.lineTo(s * 185, -150); ctx.moveTo(s * 80, -40); ctx.lineTo(s * 190, -85); ctx.moveTo(s * 80, -35); ctx.lineTo(s * 165, -35); ctx.stroke();
+  } else if (id === "armL" || id === "armR") {
+    const s = id === "armL" ? -1 : 1;
+    ctx.strokeStyle = "#1a0b2e"; ctx.lineWidth = 36; ctx.beginPath(); ctx.moveTo(s * 65, -10); ctx.quadraticCurveTo(s * 115, -10, s * 128, 28); ctx.stroke();
+    ctx.strokeStyle = body; ctx.lineWidth = 26; ctx.stroke();
+    ctx.fillStyle = body; ctx.strokeStyle = "#1a0b2e"; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(s * 128, 36, 26, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#fff8e6";
+    for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(s * 128 + k * 14 - 6, 56); ctx.lineTo(s * 128 + k * 14, 78); ctx.lineTo(s * 128 + k * 14 + 6, 56); ctx.fill(); ctx.lineWidth = 3; ctx.stroke(); }
+  } else if (id === "head") {
+    // horns
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 18, -140); ctx.quadraticCurveTo(s * 45, -160, s * 58, -192); ctx.quadraticCurveTo(s * 55, -150, s * 44, -128); ctx.closePath();
+      ctx.fillStyle = white ? "#fff" : "#fff1cc"; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = "#1a0b2e"; ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(0, -95, 58, 0, 7); ctx.fillStyle = body; ctx.fill(); ctx.lineWidth = 7; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+    if (white) return;
+    const E = G && G.enemy, hurt = E && E.hurt > .3, mad = E && (E.lunge > .1 || E.rage / E.rageMax > .75);
+    // eyes follow the gun
+    const ang = Math.atan2(L.gunY - (L.ey - 95 * L.S), L.gunX - L.ex);
+    for (const s of [-1, 1]) {
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(s * 22, -103, 16, E && E.blink > 0 ? 2 : 18, 0, 0, 7); ctx.fill(); ctx.lineWidth = 4; ctx.stroke();
+      if (hurt) { ctx.strokeStyle = "#1a0b2e"; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(s * 22 - 8, -111); ctx.lineTo(s * 22 + 8, -95); ctx.moveTo(s * 22 + 8, -111); ctx.lineTo(s * 22 - 8, -95); ctx.stroke(); }
+      else if (!(E && E.blink > 0)) { ctx.fillStyle = mad ? "#ff2a4a" : "#1a0b2e"; ctx.beginPath(); ctx.arc(s * 22 + Math.cos(ang) * 6, -101 + Math.sin(ang) * 7, 7, 0, 7); ctx.fill(); }
+      ctx.strokeStyle = "#1a0b2e"; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(s * 40, -130); ctx.lineTo(s * 8, mad ? -116 : -122); ctx.stroke();
+    }
+    // mouth + fangs
+    ctx.fillStyle = mad ? "#7a0018" : "#2a0a1a"; ctx.beginPath();
+    if (mad || hurt) ctx.ellipse(0, -66, 22, 14, 0, 0, 7); else { ctx.moveTo(-26, -72); ctx.quadraticCurveTo(0, -48, 26, -72); ctx.quadraticCurveTo(0, -62, -26, -72); }
+    ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+    ctx.fillStyle = "#fff"; for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 14, -70); ctx.lineTo(s * 8, -58); ctx.lineTo(s * 4, -70); ctx.fill(); }
+    ctx.fillStyle = "rgba(255,120,150,.35)"; for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 38, -80, 9, 6, 0, 0, 7); ctx.fill(); }
+  } else if (id === "core") {
+    const t = performance.now() / 1000, pulse = 1 + Math.sin(t * 6) * .08;
+    ctx.save(); ctx.translate(0, 40); ctx.scale(pulse, pulse);
+    ctx.shadowColor = "#ff2a4a"; ctx.shadowBlur = white ? 0 : 25;
+    ctx.fillStyle = white ? "#fff" : "#ff2a4a"; ctx.beginPath(); ctx.moveTo(0, 22); ctx.bezierCurveTo(-40, -5, -22, -38, 0, -18); ctx.bezierCurveTo(22, -38, 40, -5, 0, 22); ctx.fill();
+    ctx.shadowBlur = 0; ctx.lineWidth = 5; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.beginPath(); ctx.ellipse(-10, -14, 6, 4, -.6, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+}
+function drawDemon(E){
+  const S = L.S * E.K.scale, K = E.K;
+  const breath = 1 + Math.sin(E.bob * 3) * .015 + E.lunge * .12;
+  const squash = 1 - E.hurt * .06;
+  ctx.save();
+  ctx.translate(L.ex, L.ey + E.yOff + bobY(E));
+  ctx.scale(S * breath / squash, S * breath * squash);
+  const has = id => E.parts.find(p => p.id === id);
+  const alive = id => { const p = has(id); return p && p.alive; };
+  const white = id => { const p = has(id); return p && p.flash > 0; };
+  // shadow
+  ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(0, 150 - (E.yOff < 0 ? 0 : 0), 110, 18, 0, 0, 7); ctx.fill();
+  for (const id of ["wingL", "wingR"]) if (alive(id)) drawPartShape(id, K, white(id));
+  // tail
+  ctx.strokeStyle = "#1a0b2e"; ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(50, 110); ctx.quadraticCurveTo(140, 150, 150, 90); ctx.stroke();
+  ctx.strokeStyle = K.dark; ctx.lineWidth = 9; ctx.stroke();
+  ctx.fillStyle = K.dark; ctx.beginPath(); ctx.moveTo(150, 70); ctx.lineTo(166, 98); ctx.lineTo(136, 96); ctx.closePath(); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+  // legs
+  for (const s of [-1, 1]) { ctx.fillStyle = K.dark; ctx.beginPath(); ctx.ellipse(s * 42, 130, 26, 16, 0, 0, 7); ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = "#1a0b2e"; ctx.stroke(); }
+  // body
+  ctx.beginPath(); ctx.ellipse(0, 40, 88, 98, 0, 0, 7); ctx.fillStyle = K.body; ctx.fill(); ctx.lineWidth = 7; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0, 55, 56, 64, 0, 0, 7); ctx.fillStyle = K.belly; ctx.fill();
+  // stumps where arms were
+  for (const id of ["armL", "armR"]) { const p = has(id); if (p && !p.alive) { const s = id === "armL" ? -1 : 1; ctx.fillStyle = K.dark; ctx.beginPath(); ctx.arc(s * 72, -6, 14, 0, 7); ctx.fill(); } }
+  for (const id of ["armL", "armR"]) if (alive(id)) drawPartShape(id, K, white(id));
+  const core = has("core");
+  if (core && core.alive) {
+    drawPartShape("core", K, white("core"));
+    if (core.shield) { // chains + padlock
+      ctx.strokeStyle = "#c9c9d6"; ctx.lineWidth = 7; ctx.setLineDash([12, 6]);
+      ctx.beginPath(); ctx.moveTo(-60, 0); ctx.lineTo(60, 80); ctx.moveTo(60, 0); ctx.lineTo(-60, 80); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "#e0b400"; rr(-16, 34, 32, 26, 6); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 34, 10, Math.PI, 0); ctx.stroke();
+    }
+  }
+  if (alive("head")) drawPartShape("head", K, white("head"));
+  else { ctx.fillStyle = K.dark; ctx.beginPath(); ctx.ellipse(0, -48, 30, 12, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "rgba(200,200,210,.5)"; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(Math.sin(E.bob * 3 + i) * 10, -62 - i * 16 - (E.bob * 40 % 16), 8 + i * 3, 0, 7); ctx.fill(); } }
+  // hp pips under each living part
+  ctx.restore();
+  for (const p of E.parts) if (p.alive && p.max > 1) {
+    const c = partWorld(p), n = p.max, w = 9, gap = 3, tot = n * w + (n - 1) * gap;
+    for (let i = 0; i < n; i++) { ctx.fillStyle = i < p.hp ? "#3ee6a8" : "rgba(0,0,0,.45)"; rr(c.x - tot / 2 + i * (w + gap), c.y + p.r * L.S * .55, w, 6, 3); ctx.fill(); }
+  }
+}
+function drawWisp(w, E){
+  const S = L.S, t = performance.now() / 1000 + w.ph;
+  const x = L.ex + w.bx * S, y = L.ey + E.yOff + w.by * S - 34 * S + Math.sin(t * 3) * 6;
+  ctx.save(); ctx.translate(x, y); ctx.scale(S, S);
+  ctx.fillStyle = "rgba(232,220,255,.92)"; ctx.beginPath(); ctx.arc(0, 0, 20, Math.PI, 0); ctx.lineTo(20, 18);
+  for (let i = 0; i < 4; i++) ctx.quadraticCurveTo(15 - i * 10, 26 + (i % 2) * 4, 10 - i * 10, 18); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#1a0b2e"; ctx.beginPath(); ctx.arc(-7, -2, 3.5, 0, 7); ctx.arc(7, -2, 3.5, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawSticker(s, E, isWisp){
+  if (s.word == null) { s.rect = null; return; }
+  const S = L.S, E_S = isWisp ? S : S * E.K.scale;
+  const cx = L.ex + s.bx * E_S, cy = L.ey + E.yOff + (isWisp ? 0 : bobY(E)) + s.by * E_S;
+  const fs = Math.round(clamp(21 * S, 15, 26));
+  ctx.font = `${fs}px ${FONT}`;
+  const txt = CARDS[s.word][0], tw = ctx.measureText(txt).width;
+  const w = tw + fs * 1.1, h = fs * 1.75, x = cx - w / 2, y = cy - h / 2;
+  s.rect = { x, y, w, h };
+  const rev = G.reveal && G.reveal.slot === s && performance.now() < G.reveal.until;
+  const t = performance.now() / 1000;
+  ctx.save();
+  if (rev) { ctx.shadowColor = "#3ee6a8"; ctx.shadowBlur = 25 + Math.sin(t * 12) * 10; }
+  ctx.fillStyle = "#1a0b2e"; rr(x, y + 4, w, h, h / 2); ctx.fill();
+  ctx.fillStyle = rev ? "#3ee6a8" : isWisp ? "#efe6ff" : "#fffaf0"; rr(x, y, w, h, h / 2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.lineWidth = 3; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+  ctx.fillStyle = "#1a0b2e"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, cx, cy + 1);
+  if (rev) { ctx.font = `${Math.round(fs * .7)}px ${FONT}`; ctx.fillStyle = "#3ee6a8"; ctx.fillText("✓ " + meaning(s.word), cx, y + h + fs * .7); }
+  ctx.restore();
+}
+function drawFX(){
+  for (const r of FX.rings) { ctx.globalAlpha = Math.max(0, r.life / r.maxL); ctx.strokeStyle = r.col; ctx.lineWidth = 6 * (r.life / r.maxL) + 1; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, 7); ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  for (const b of FX.beams) { const a = b.life / b.max; ctx.strokeStyle = b.col; ctx.shadowColor = b.col; ctx.shadowBlur = 20;
+    ctx.lineWidth = 16 * a; ctx.globalAlpha = a; ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke();
+    ctx.strokeStyle = "#fff"; ctx.lineWidth = 5 * a; ctx.stroke(); }
+  for (const b of FX.bolts) { const a = b.life / b.max; ctx.globalAlpha = a; ctx.strokeStyle = b.col; ctx.shadowColor = b.col; ctx.shadowBlur = 24; ctx.lineWidth = 9 * a + 2;
+    ctx.beginPath(); b.pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.stroke(); }
+  ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  for (const s of FX.shots) {
+    for (let i = 0; i < s.trail.length; i++) { const [x, y] = s.trail[i]; ctx.globalAlpha = i / s.trail.length * .6; ctx.fillStyle = s.col || (s.type === "rocket" ? "#ffb347" : "#ffd23f"); ctx.beginPath(); ctx.arc(x, y, 4 + i * .6, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    if (s.type === "star") { star(s.x, s.y, 12, "#ffd23f"); }
+    else if (s.type === "pellet") { ctx.fillStyle = s.col; ctx.beginPath(); ctx.arc(s.x, s.y, 7, 0, 7); ctx.fill(); }
+    else if (s.type === "rocket") { ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(Math.atan2(s.ty - s.y, s.tx - s.x)); ctx.fillStyle = "#e9e9f2"; rr(-16, -7, 28, 14, 7); ctx.fill(); ctx.fillStyle = "#ff4f6d"; ctx.beginPath(); ctx.moveTo(12, -7); ctx.lineTo(22, 0); ctx.lineTo(12, 7); ctx.fill(); ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.moveTo(-16, -5); ctx.lineTo(-28 - Math.random() * 10, 0); ctx.lineTo(-16, 5); ctx.fill(); ctx.restore(); }
+  }
+  for (const p of FX.particles) {
+    const a = clamp(p.life / (p.max * .6), 0, 1); ctx.globalAlpha = a;
+    if (p.shape === "star") star(p.x, p.y, p.size * 1.4, p.col, p.rot);
+    else if (p.shape === "confetti") { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.col; ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2); ctx.restore(); }
+    else if (p.shape === "coin") { ctx.globalAlpha = 1; ctx.save(); ctx.translate(p.x, p.y); ctx.scale(Math.abs(Math.cos(p.rot)) + .15, 1); ctx.fillStyle = "#ffd23f"; ctx.beginPath(); ctx.arc(0, 0, p.size, 0, 7); ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = "#b37b00"; ctx.stroke(); ctx.fillStyle = "#b37b00"; ctx.font = `${p.size}px ${FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("₩", 0, 1); ctx.restore(); }
+    else if (p.shape === "spark") { ctx.strokeStyle = p.col; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .04, p.y - p.vy * .04); ctx.stroke(); }
+    else { ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.shape === "smoke" ? p.size * (1.6 - a) : p.size, 0, 7); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  for (const d of FX.debris) {
+    ctx.save(); ctx.globalAlpha = clamp(d.life, 0, 1); ctx.translate(d.x, d.y); ctx.rotate(d.rot);
+    const S = L.S * KINDS[d.kind].scale; ctx.scale(S, S); ctx.translate(-d.part.lx, -d.part.ly);
+    drawPartShape(d.part.id, KINDS[d.kind], false); ctx.restore();
+  }
+  for (const t of FX.texts) {
+    const a = clamp(t.life / t.max * 1.5, 0, 1), pop = 1 + Math.max(0, (t.life / t.max - .8)) * 2.5;
+    ctx.globalAlpha = a; ctx.font = `${Math.round(t.size * pop)}px ${FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const tw = ctx.measureText(t.text).width; t.x = clamp(t.x, Math.min(W / 2, tw / 2 + 8), Math.max(W / 2, W - tw / 2 - 8));   // never off-screen
+    ctx.lineWidth = 6; ctx.strokeStyle = "#1a0b2e"; ctx.strokeText(t.text, t.x, t.y); ctx.fillStyle = t.col; ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+}
+function star(x, y, r, col, rot = 0){
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.fillStyle = col; ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr2 = i % 2 ? r * .45 : r; ctx.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2); }
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function wrapLines(text, maxW){
+  const words = text.split(/(\s+)/), lines = []; let cur = "";
+  for (const w of words) { const t = cur + w; if (ctx.measureText(t).width > maxW && cur.trim()) { lines.push(cur.trim()); cur = w.trimStart(); } else cur = t; }
+  if (cur.trim()) lines.push(cur.trim());
+  // CJK/Thai without spaces: hard-break by characters
+  const out = [];
+  for (const l of lines) { if (ctx.measureText(l).width <= maxW) { out.push(l); continue; } let c = ""; for (const ch of l) { if (ctx.measureText(c + ch).width > maxW) { out.push(c); c = ch; } else c += ch; } if (c) out.push(c); }
+  return out.slice(0, 3);
+}
+function drawHUD(){
+  const top = 8 + (window.visualViewport ? 0 : 0);
+  // hearts
+  ctx.textBaseline = "middle"; ctx.textAlign = "left";
+  for (let i = 0; i < G.maxHearts; i++) {
+    const s = i === G.hearts && G.heartPop > 0 ? 1 + G.heartPop * .6 : 1;
+    ctx.font = `${Math.round(22 * s)}px ${FONT}`; ctx.globalAlpha = i < G.hearts ? 1 : .25; ctx.fillText("❤️", 12 + i * 26, top + 20);
+  }
+  ctx.globalAlpha = 1;
+  // score + kills
+  ctx.textAlign = "right"; ctx.font = `${Math.round(26 * (1 + G.scorePop * .3))}px ${FONT}`;
+  ctx.lineWidth = 5; ctx.strokeStyle = "#1a0b2e"; const sc = Math.round(G.shownScore).toLocaleString();
+  ctx.strokeText(sc, W - 12, top + 20); ctx.fillStyle = "#ffd23f"; ctx.fillText(sc, W - 12, top + 20);
+  ctx.font = `15px ${FONT}`; ctx.fillStyle = "#c9b6ef"; ctx.fillText("👹 × " + G.kills, W - 12, top + 44);
+  // prompt banner
+  const R = G.round, E = G.enemy;
+  const bx = 12, by = 62, bw = W - 24, bh = 70;
+  ctx.fillStyle = "rgba(0,0,0,.35)"; rr(bx, by + 5, bw, bh, 18); ctx.fill();
+  ctx.fillStyle = "#fff6e8"; rr(bx, by, bw, bh, 18); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+  ctx.textAlign = "center";
+  if (R) {
+    ctx.fillStyle = "#8a5cd6"; ctx.font = `13px ${FONT}`; ctx.fillText("🎯 " + T("find"), W / 2, by + 13);
+    let fs = 24; ctx.font = `${fs}px ${FONT}`;
+    let lines = wrapLines(meaning(R.ans), bw - 24);
+    if (lines.length > 1) { fs = 19; ctx.font = `${fs}px ${FONT}`; lines = wrapLines(meaning(R.ans), bw - 24).slice(0, 2); }
+    ctx.fillStyle = "#1a0b2e";
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, by + 42 + (i - (lines.length - 1) / 2) * (fs + 2)));
+  } else if (E && E.dead) { ctx.fillStyle = "#1a0b2e"; ctx.font = `24px ${FONT}`; ctx.fillText("✨ 퇴마 성공 ✨", W / 2, by + bh / 2); }
+  else if (E) { ctx.fillStyle = "#1a0b2e"; ctx.font = `22px ${FONT}`; ctx.fillText(E.K.name + " 등장!", W / 2, by + bh / 2); }
+  // rage bar
+  if (E && !E.dead) {
+    const ry = by + bh + 10, rw = bw - 40, frac = R ? clamp(E.rage / E.rageMax, 0, 1) : 0;
+    ctx.fillStyle = "rgba(0,0,0,.45)"; rr(bx + 34, ry, rw, 12, 6); ctx.fill();
+    const hot = frac > .75, pulse = hot ? (Math.sin(performance.now() / 70) + 1) / 2 : 0;
+    ctx.fillStyle = hot ? `rgb(255,${60 + pulse * 80},80)` : "#ff8c1a"; rr(bx + 34, ry, Math.max(12, rw * frac), 12, 6); ctx.fill();
+    ctx.font = `22px ${FONT}`; ctx.textAlign = "left"; ctx.fillText("😈", bx + 2, ry + 7);
+  }
+  // combo
+  if (G.combo >= 2) {
+    const s = 1 + Math.sin(performance.now() / 90) * .05;
+    ctx.save(); ctx.translate(14, H * .5); ctx.rotate(-.12); ctx.scale(s, s); ctx.textAlign = "left";
+    ctx.font = `${24 + Math.min(20, G.combo)}px ${FONT}`; ctx.lineWidth = 6; ctx.strokeStyle = "#1a0b2e";
+    const col = G.combo >= 15 ? "#b388ff" : G.combo >= 10 ? "#ff7a1a" : G.combo >= 6 ? "#3ee6ff" : G.combo >= 3 ? "#ff5fa2" : "#ffd23f";
+    ctx.strokeText(G.combo + "🔥", 0, 0); ctx.fillStyle = col; ctx.fillText(G.combo + "🔥", 0, 0);
+    ctx.font = `13px ${FONT}`; ctx.fillStyle = "#fff"; ctx.fillText("COMBO", 2, 24); ctx.restore();
+  }
+  // gun
+  const w = weapon();
+  ctx.save(); ctx.translate(L.gunX, L.gunY); ctx.rotate(G.gunAng + Math.PI / 2);
+  ctx.translate(0, G.gunKick * 12);
+  ctx.fillStyle = "#1a0b2e"; rr(-17, -62, 34, 70, 12); ctx.fill();
+  ctx.fillStyle = w.color; rr(-13, -58, 26, 62, 10); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,.4)"; rr(-8, -54, 6, 50, 3); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = "#1a0b2e"; ctx.beginPath(); ctx.arc(L.gunX, L.gunY + 8, 30, 0, 7); ctx.fill();
+  ctx.fillStyle = w.color; ctx.beginPath(); ctx.arc(L.gunX, L.gunY + 8, 24, 0, 7); ctx.fill();
+  ctx.font = `24px ${FONT}`; ctx.textAlign = "center"; ctx.fillText(w.icon, L.gunX, L.gunY + 9);
+  // weapon label + next unlock
+  ctx.textAlign = "left"; ctx.font = `17px ${FONT}`; ctx.fillStyle = w.color; ctx.fillText(w.name, 12, H - 64);
+  ctx.font = `12px ${FONT}`; ctx.fillStyle = "#c9b6ef"; ctx.fillText(w.en + " · dmg " + w.dmg, 12, H - 45);
+  const nx = WEAPONS[G.weaponIdx + 1];
+  if (nx) { ctx.fillStyle = "#fff"; ctx.globalAlpha = .75; ctx.fillText("next " + nx.icon + " @ " + nx.at + "🔥", 12, H - 27); ctx.globalAlpha = 1; }
+  // ULT button
+  const ux = W - 52, uy = H - 58, full = G.ult >= ULT_MAX, t = performance.now() / 1000;
+  ctx.fillStyle = "#1a0b2e"; ctx.beginPath(); ctx.arc(ux, uy, 36, 0, 7); ctx.fill();
+  ctx.strokeStyle = full ? `hsl(${(t * 200) % 360},100%,65%)` : "#ffd23f"; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.arc(ux, uy, 32, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * G.ult / ULT_MAX); ctx.stroke();
+  ctx.font = `${full ? 30 + Math.sin(t * 10) * 3 : 26}px ${FONT}`; ctx.textAlign = "center"; ctx.globalAlpha = full ? 1 : .45; ctx.fillText("🔨", ux, uy + 1); ctx.globalAlpha = 1;
+  if (full) { ctx.font = `12px ${FONT}`; ctx.fillStyle = "#ffd23f"; ctx.fillText("TAP!", ux, uy + 46); }
+}
+function drawBanner(){
+  if (G.banner) {
+    const b = G.banner, k = b.life / b.max, pop = k > .85 ? 1 + (k - .85) * 5 : 1;
+    ctx.save(); ctx.translate(W / 2, H * .36); ctx.scale(pop, pop); ctx.globalAlpha = clamp(k * 3, 0, 1);
+    ctx.font = `44px ${FONT}`; ctx.textAlign = "center"; ctx.lineWidth = 9; ctx.strokeStyle = "#1a0b2e"; ctx.strokeText(b.text, 0, 0); ctx.fillStyle = b.col; ctx.fillText(b.text, 0, 0);
+    if (b.sub) { ctx.font = `18px ${FONT}`; ctx.lineWidth = 5; ctx.strokeText(b.sub, 0, 36); ctx.fillStyle = "#fff"; ctx.fillText(b.sub, 0, 36); }
+    ctx.restore();
+  }
+}
+function drawHammer(){
+  if (!G.hammer) return;
+  const t = G.hammer.t, k = clamp(t / .35, 0, 1), ease = k * k;
+  const ang = -2.2 + ease * 2.2;
+  ctx.save(); ctx.translate(L.ex + 150 * L.S, L.ey - 260 * L.S); ctx.rotate(ang);
+  ctx.fillStyle = "#8b5a2b"; rr(-9, 0, 18, 190 * L.S, 8); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#1a0b2e"; ctx.stroke();
+  ctx.fillStyle = "#ff4f6d"; rr(-70 * L.S, 170 * L.S, 140 * L.S, 80 * L.S, 20); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#fff"; ctx.font = `${Math.round(26 * L.S)}px ${FONT}`; ctx.textAlign = "center"; ctx.fillText("100t", 0, 212 * L.S);
+  ctx.restore();
+}
+function draw(){
+  ctx.save();
+  if (FX.shake > 0) ctx.translate(rnd(-FX.shake, FX.shake) * .6, rnd(-FX.shake, FX.shake) * .6);
+  drawBG();
+  if (G && G.enemy) {
+    const E = G.enemy;
+    if (!E.dead) {
+      drawDemon(E);
+      drawBanner();                       // under the stickers, so a banner never hides a word
+      if (G.round) {
+        for (const w of E.wisps) if (w.alive) drawWisp(w, E);
+        for (const p of E.parts) if (p.alive && !p.shield && p.word != null) drawSticker(p, E, false);
+        for (const w of E.wisps) if (w.alive) drawSticker(w, E, true); else w.rect = null;
+      }
+    }
+    else drawBanner();
+    drawHammer();
+  }
+  drawFX();
+  if (FX.slashes > 0) {
+    const a = FX.slashes / .5; ctx.strokeStyle = `rgba(255,40,70,${a})`; ctx.lineWidth = 14 * a + 2; ctx.lineCap = "round";
+    for (let i = 0; i < 3; i++) { const o = (i - 1) * 60; ctx.beginPath(); ctx.moveTo(W * .2 + o, H * .25); ctx.lineTo(W * .7 + o, H * .75); ctx.stroke(); }
+  }
+  ctx.restore();
+  if (FX.flash) { ctx.globalAlpha = clamp(FX.flash.a, 0, 1); ctx.fillStyle = FX.flash.col; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  if (G) drawHUD();
+}
+
+/* ============================== loop ============================== */
+function frame(now){
+  const rdt = Math.min(.05, (now - last) / 1000); last = now;
+  let dt = rdt;
+  if (G && G.paused) dt = 0;
+  else if (G && G.hitstop > 0) { G.hitstop -= rdt; dt = 0; }
+  else if (G) dt = rdt * G.timeScale;
+  update(dt, G && G.paused ? 0 : rdt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ============================== menu ============================== */
+let sel = { ch: CHAPTERS.map(c => c.id), cls: CLASSES.map(c => c.sfx), star: false };
+try { const s = JSON.parse(store.get("k5b_demon_sel") || "null"); if (s && Array.isArray(s.ch)) sel = { ...sel, ...s }; } catch(e) {}
+function selectedPool(){
+  const secs = new Set(SECTIONS.filter(s => sel.ch.includes(s.ch) && sel.cls.includes(s.cls)).map(s => s.id));
+  return CARDS.map((c, i) => i).filter(i => secs.has(CARDS[i][3]) && (!sel.star || CARDS[i][2]));
+}
+function renderMenu(){
+  document.querySelectorAll("[data-i]").forEach(el => { const k = el.dataset.i; if (k === "how") el.innerHTML = T(k); else el.textContent = T(k); });
+  $("#chChips").innerHTML = CHAPTERS.map(c => `<button class="chip${sel.ch.includes(c.id) ? " on" : ""}" data-ch="${c.id}">${esc(c.title)}<small>${esc(c.theme)}</small></button>`).join("");
+  $("#clsChips").innerHTML = CLASSES.map(c => `<button class="chip${sel.cls.includes(c.sfx) ? " on" : ""}" data-cls="${c.sfx}">${esc(c.title)}</button>`).join("");
+  $("#starChip").classList.toggle("on", sel.star);
+  const n = selectedPool().length;
+  $("#count").textContent = n >= 8 ? n + " " + T("words") : T("pick");
+  $("#count").classList.toggle("bad", n < 8); $("#startBtn").disabled = n < 8;
+  const best = store.get("k5b_demon_best"); $("#bestLine").textContent = best ? "🏆 " + T("best") + ": " + (+best).toLocaleString() : "";
+  $("#muteBtn2").textContent = (muted ? "🔇 " : "🔊 ") + T("sound");
+  store.set("k5b_demon_sel", JSON.stringify(sel));
+}
+$("#lang").innerHTML = LANGS.map(l => `<option value="${l.code}">${esc(l.native)}</option>`).join("");
+$("#lang").value = lang;
+$("#lang").onchange = e => { lang = e.target.value; store.set("k5b_lang", lang); renderMenu(); };
+$("#chChips").onclick = e => { const b = e.target.closest("[data-ch]"); if (!b) return; const id = b.dataset.ch;
+  sel.ch = sel.ch.includes(id) ? sel.ch.filter(x => x !== id) : [...sel.ch, id]; renderMenu(); };
+$("#clsChips").onclick = e => { const b = e.target.closest("[data-cls]"); if (!b) return; const id = b.dataset.cls;
+  sel.cls = sel.cls.includes(id) ? sel.cls.filter(x => x !== id) : [...sel.cls, id]; renderMenu(); };
+$("#starChip").onclick = () => { sel.star = !sel.star; renderMenu(); };
+$("#startBtn").onclick = startGame;
+$("#againBtn").onclick = startGame;
+$("#menuBtn").onclick = () => { G = null; resetFX(); $("#over").hidden = true; $("#menu").hidden = false; renderMenu(); };
+function togglePause(){
+  if (!G || G.over) return;
+  G.paused = !G.paused; $("#pause").hidden = !G.paused;
+}
+$("#pauseBtn").onclick = togglePause;
+$("#resumeBtn").onclick = togglePause;
+$("#quitBtn").onclick = () => { $("#pause").hidden = true; G.paused = false; gameOver(); };
+$("#muteBtn2").onclick = () => { muted = !muted; store.set("k5b_demon_mute", muted ? "1" : "0"); renderMenu(); };
+document.addEventListener("visibilitychange", () => { if (document.hidden && G && !G.paused && !G.over) togglePause(); });
+
+resize(); renderMenu();
+(document.fonts && document.fonts.load ? document.fonts.load(`20px "Jua"`).catch(() => {}) : Promise.resolve()).finally(() => requestAnimationFrame(frame));
+</script>
+</body>
+</html>

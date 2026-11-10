@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Korean 5B — Word Blaster</title>
+<!-- installable as a full-screen app: manifest + the shared pass-through sw.js (site/) -->
+<link rel="manifest" href="blaster.webmanifest">
+<meta name="theme-color" content="#05070f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Word Blaster">
+<link rel="apple-touch-icon" href="icon-blaster-192.png">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#05070f;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",Roboto,sans-serif;
+    color:#eaf0fb;user-select:none;touch-action:none}
+  #wrap{position:relative;width:100vw;height:100vh;overflow:hidden}
+  canvas{position:absolute;inset:0;display:block;cursor:none}
+  /* HUD */
+  #hud{position:absolute;top:0;left:0;right:0;padding:10px 14px;pointer-events:none;z-index:5}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .prompt{
+    text-align:center;margin:6px auto 0;max-width:92%;
+  }
+  .plabel{font-size:12px;letter-spacing:2px;color:#7d8bb0;text-transform:uppercase}
+  .pword{font-size:clamp(28px,7vw,52px);font-weight:800;line-height:1.15;
+    text-shadow:0 2px 16px rgba(91,140,255,.45)}
+  .ppos{font-size:13px;color:#8ea0c8;font-style:italic;margin-top:2px}
+  .stat{background:rgba(20,28,46,.7);border:1px solid #2b3a5c;border-radius:10px;
+    padding:5px 10px;font-size:13px;font-weight:600;backdrop-filter:blur(6px)}
+  .stat b{color:#5b8cff}
+  .hearts{font-size:18px;letter-spacing:2px}
+  .uniqline{text-align:center;margin-top:6px}
+  .uniqline span{background:rgba(20,28,46,.6);border:1px solid #2b3a5c;border-radius:8px;padding:3px 11px;font-size:12px;color:#8ea0c8}
+  .uniqline b{color:#ffd85c}
+  /* mastery: land 2x the deck size in correct hits */
+  .mastery b{color:#37d18f}
+  .mastery.done{background:linear-gradient(180deg,rgba(255,216,92,.24),rgba(255,216,92,.10));
+    border-color:#ffd85c;color:#ffd85c;font-weight:800;letter-spacing:.6px;
+    animation:mpulse 1.8s ease-in-out infinite}
+  @keyframes mpulse{0%,100%{box-shadow:0 0 12px rgba(255,216,92,.35)}50%{box-shadow:0 0 26px rgba(255,216,92,.75)}}
+  #tbarWrap{height:8px;background:rgba(255,255,255,.08);border-radius:4px;margin-top:10px;overflow:hidden}
+  #tbar{height:100%;width:100%;background:linear-gradient(90deg,#37d18f,#ffd85c);border-radius:4px;transition:width .08s linear}
+  /* overlays */
+  /* the menu is taller than a phone screen: it scrolls, and auto margins centre it only when it fits
+     (justify-content:center would cut the top off and leave nothing to scroll to) */
+  .screen{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
+    align-items:center;justify-content:flex-start;text-align:center;padding:24px;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;
+    background:radial-gradient(ellipse at 50% 35%,rgba(20,30,60,.6),rgba(5,7,15,.94));backdrop-filter:blur(3px)}
+  .screen > :first-child{margin-top:auto}
+  .screen > :last-child{margin-bottom:auto}
+  /* phones draw the page under Android's navigation bar: size to the visible screen and leave room at the
+     bottom so the last lines of a menu can be scrolled clear of it */
+  html,body{height:100dvh}
+  .screen{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  .screen.hidden{display:none}
+  h1{font-size:clamp(30px,8vw,54px);font-weight:900;letter-spacing:.5px;
+    background:linear-gradient(90deg,#5b8cff,#8be0ff,#ffd85c);-webkit-background-clip:text;background-clip:text;color:transparent;
+    margin-bottom:6px}
+  .tag{color:#9fb0d6;font-size:15px;margin-bottom:22px;max-width:520px;line-height:1.5}
+  .opts{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:18px}
+  .field{background:rgba(20,28,46,.8);border:1px solid #2b3a5c;border-radius:12px;padding:9px 12px;font-size:13px;color:#b9c6e6}
+  select{background:#141c2e;color:#eaf0fb;border:1px solid #2b3a5c;border-radius:8px;padding:7px 10px;font-size:14px;outline:none}
+  .toggle{cursor:pointer;pointer-events:auto}
+  .toggle .on{color:#5b8cff;font-weight:700}
+  .btn{pointer-events:auto;cursor:pointer;border:none;border-radius:14px;padding:15px 40px;font-size:19px;font-weight:800;
+    background:linear-gradient(180deg,#5b8cff,#3f6fe0);color:#fff;box-shadow:0 8px 24px rgba(63,111,224,.5);transition:.12s}
+  .btn:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(63,111,224,.6)}
+  .btn.sm{padding:11px 24px;font-size:15px;background:linear-gradient(180deg,#26314c,#1b2338);box-shadow:none;border:1px solid #2b3a5c}
+  .how{color:#7d8bb0;font-size:13px;margin-top:20px;line-height:1.7;max-width:460px}
+  .how b{color:#b9c6e6}
+  .big{font-size:clamp(40px,12vw,80px);font-weight:900;margin:4px 0}
+  .go .gsub{color:#9fb0d6;font-size:16px;margin:2px 0}
+  .go .gword{color:#ffd85c;font-weight:700}
+  /* champion metagame */
+  .cwrap{display:flex;flex-direction:column;align-items:center;gap:7px;margin-bottom:16px}
+  .cpanel{display:flex;align-items:center;gap:16px;background:rgba(16,24,44,.85);border:1px solid #2b3a5c;border-radius:14px;padding:10px 18px}
+  .ccol{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .cname{font-size:11px;letter-spacing:1px;color:#8ea0c8;text-transform:uppercase;font-weight:700}
+  .cstat{font-size:13px;color:#dfe7fb}
+  .cstat b{color:#ffd85c}
+  .cvs{font-size:15px;font-weight:900;color:#ff6b8a}
+  .chpbar{width:110px;height:8px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden}
+  .chpfill{height:100%;background:linear-gradient(90deg,#ff6b8a,#ff3b5b);border-radius:4px;transition:width .3s}
+  .cup{margin-top:3px;pointer-events:auto;cursor:pointer;background:rgba(20,28,46,.8);border:1px solid #3a4a6e;border-radius:10px;color:#ffd85c;font-size:12px;padding:6px 10px;font-weight:600}
+  .cup.cant{opacity:.45}
+  .cnote{font-size:11.5px;color:#7d8bb0;max-width:430px;line-height:1.5}
+  #combatOv{position:absolute;top:58px;left:50%;transform:translateX(-50%);z-index:9;display:flex;align-items:center;gap:12px;
+    background:rgba(10,15,30,.94);border:1px solid #3a4a6e;border-radius:16px;padding:10px 18px;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  #combatOv.hidden{display:none}
+  #cbMid{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:160px}
+  #cbTitle{font-size:13px;font-weight:800;color:#ffd85c;letter-spacing:1px}
+  #cbLog{font-size:13px;font-weight:700;color:#eef3ff;min-height:18px}
+  .cbspr{transition:transform .18s}
+  .cbspr.lunge{transform:translateX(26px)}
+  .cbspr.hurt{transform:translateX(10px) rotate(8deg)}
+  /* word explanation panel (marathon mode) */
+  #infoOv{position:absolute;inset:0;z-index:11;display:flex;align-items:center;justify-content:center;padding:18px;
+    background:rgba(3,6,14,.82);backdrop-filter:blur(4px);cursor:pointer}
+  #infoOv.hidden{display:none}
+  .ibox{max-width:560px;width:100%;max-height:88vh;overflow-y:auto;background:#101828;border:1px solid #3a4a6e;
+    border-radius:18px;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.6);cursor:default;text-align:left}
+  .iword{font-size:clamp(30px,8vw,44px);font-weight:900;color:#8be0ff;line-height:1.15}
+  .ipos{font-size:13px;color:#8ea0c8;font-style:italic;margin-bottom:12px}
+  .isec{margin-top:12px}
+  .ilab{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#7d8bb0;font-weight:700;margin-bottom:3px}
+  .ival{font-size:16px;line-height:1.65;color:#eaf0fb}
+  .ihanja{font-size:30px;font-weight:800;color:#ffd85c;letter-spacing:3px}
+  .iparts{font-size:14px;color:#c8b273;margin-top:2px}
+  .ichar{display:flex;gap:12px;align-items:flex-start;background:rgba(60,48,16,.35);border:1px solid #4a3d1c;
+    border-radius:10px;padding:9px 11px;margin-top:7px}
+  .ichar .cbig{font-size:34px;font-weight:800;color:#ffd85c;line-height:1;flex:0 0 auto;min-width:40px;text-align:center}
+  .ichar .cbody{flex:1;min-width:0}
+  .ichar .ckr{font-size:15px;color:#ffe9a8;font-weight:700}
+  .ichar .cen{font-size:14px;color:#c8b273;line-height:1.5}
+  .ichar .calso{font-size:13px;color:#9fb0d6;margin-top:4px;line-height:1.6}
+  .ichar .calso b{color:#8be0ff;font-weight:700}
+  .iex{font-size:15px;color:#b9c6e6;line-height:1.7}
+  .iexen{font-size:14px;color:#8ea0c8;font-style:italic;line-height:1.6;margin-top:3px;
+    border-left:2px solid #2b3a5c;padding-left:9px}
+  .ien{background:rgba(30,50,40,.5);border:1px solid #2f5a45;border-radius:10px;padding:9px 12px;margin-top:4px}
+  .ien div{font-size:14px;color:#9fe8c4;line-height:1.6}
+  .ien b{color:#d9ffe9}
+  .inone{font-size:14px;color:#7d8bb0;font-style:italic}
+  .inat{background:rgba(24,60,44,.4);border:1px solid #2f5a45;border-radius:10px;padding:8px 11px;
+    font-size:13.5px;color:#8ff5c8;font-weight:700;line-height:1.5}
+  .inat span{display:block;font-size:12.5px;color:#6fb894;font-weight:400;font-style:italic}
+  .iclose{margin-top:16px;width:100%;cursor:pointer;border:none;border-radius:12px;padding:11px;font-size:15px;font-weight:800;
+    background:linear-gradient(180deg,#5b8cff,#3f6fe0);color:#fff}
+  #muteBtn{position:absolute;bottom:14px;left:14px;z-index:8;pointer-events:auto;cursor:pointer;
+    background:rgba(20,28,46,.7);border:1px solid #2b3a5c;border-radius:10px;padding:6px 10px;font-size:15px}
+  .toast{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:8;
+    background:rgba(20,28,46,.92);border:1px solid #2b3a5c;border-radius:12px;padding:10px 16px;
+    font-size:15px;pointer-events:none;opacity:0;transition:opacity .2s;max-width:90%;text-align:center}
+  .toast.show{opacity:1}
+  .toast .k{color:#8be0ff;font-weight:700}
+  .toast .e{color:#37d18f}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="row">
+      <span class="stat">Lv <b id="lv">1</b></span>
+      <span class="stat">Score <b id="score">0</b></span>
+      <span class="hearts" id="hearts">❤❤❤</span>
+    </div>
+    <div class="uniqline"><span id="uniqStat">Unique 0 / 0</span> <span id="champHud">⚔ <b id="powHud">2</b> · 🪙 <b id="coinHud">0</b></span> <span id="masteryHud" class="mastery hidden">Mastery <b>0</b> / 0</span></div>
+    <div class="prompt">
+      <div class="plabel" id="plabel">shoot the meaning</div>
+      <div class="pword" id="pword">기왕</div>
+      <div class="ppos" id="ppos"></div>
+    </div>
+    <div id="tbarWrap"><div id="tbar"></div></div>
+    <div class="row" style="margin-top:6px;justify-content:center">
+      <span class="stat" id="comboStat" style="opacity:0">Combo x<b id="combo">0</b></span>
+    </div>
+  </div>
+
+  <div id="mute" hidden></div>
+  <button id="muteBtn" class="hidden">🔊</button>
+  <div class="toast" id="toast"></div>
+
+  <!-- word explanation (marathon: shoot the 📖 button) -->
+  <div id="infoOv" class="hidden">
+    <div class="ibox" id="infoBox"></div>
+  </div>
+
+  <!-- champion combat interlude -->
+  <div id="combatOv" class="hidden">
+    <canvas class="cbspr" id="cbChamp" width="84" height="84"></canvas>
+    <div id="cbMid">
+      <div id="cbTitle">AMBUSH!</div>
+      <div class="chpbar" style="width:150px;height:9px"><div class="chpfill" id="cbHp" style="width:100%"></div></div>
+      <div id="cbLog"></div>
+    </div>
+    <canvas class="cbspr" id="cbFoe" width="84" height="84"></canvas>
+  </div>
+
+  <!-- START -->
+  <div class="screen" id="startScreen">
+    <h1>WORD BLASTER</h1>
+    <div class="tag">Monsters march in carrying words. Read the target up top and <b>blast the monster with the matching answer</b>. Every 10 hits you level up — faster monsters, less time, more decoys.</div>
+    <div class="opts">
+      <label class="field">Words&nbsp; <select id="deckSel"></select></label>
+      <div class="field toggle" id="dirToggle">Mode: <span class="on" id="dirText">Korean → English</span></div>
+      <div class="field toggle" id="ultraToggle">Game: <span class="on" id="ultraText">Classic</span></div>
+      <div class="field toggle" id="notesToggle" style="display:none"></div>
+      <div class="field toggle" id="starToggle">★ Priority only: <span id="starText">off</span></div>
+    </div>
+    <div class="cwrap" id="champBox"></div>
+    <button class="btn" id="startBtn">▶ START</button>
+    <div class="how">
+      <b>Desktop:</b> move to aim, click to fire. &nbsp;<b>Mobile:</b> tap a monster.<br>
+      Hit the right one for points &amp; combo. Wrong answer or timeout costs a ❤.<br>
+      <b>🪙 Champion:</b> each level-up pays coins. Every 5 levels your champion ambushes the foe —
+      its wounds persist between runs, so keep upgrading until you finish it off!<br>
+      <b>⚡ Ultra 100:</b> time attack — no timer, no lives, instant next word. Race to 100 correct;
+      wrong clicks cost +2s. Beat your best time!<br>
+      <b>📖 Marathon:</b> study room — every word in the set exactly once, no repeats, no lives.
+      Shoot the 📖 button (top right) for the full explanation, hanja and all.
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="screen go hidden" id="overScreen">
+    <div class="gsub">GAME OVER</div>
+    <div class="big" id="finalScore">0</div>
+    <div class="gsub">reached <span class="gword" id="finalLv">Level 1</span> · <span id="finalHits">0</span> hits · <span class="gword" id="finalUniq">0</span> unique · combo x<span class="gword" id="finalCombo">0</span> · best <span class="gword" id="bestScore">0</span></div>
+    <div class="gsub" id="missLine"></div>
+    <div class="cwrap" id="champBox2" style="margin-top:18px;margin-bottom:0"></div>
+    <div style="margin-top:22px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+      <button class="btn" id="againBtn">▶ Play again</button>
+      <button class="btn sm" id="menuBtn">Menu</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DECKS = [{"id":"ch1-v","title":"1과 · 비디오","sub":"비디오: 낮 플레이드","cards":[["기왕","anyway; since things are already this way","기왕이면 좋은 걸로 = if it's all the same, the better one",1,"adverb"],["적금","installment savings (account)","적금을 넣다/들다 = to pay into savings",0,"noun"],["빡빡하다","to be packed / tight (e.g. a schedule)","일정이 빡빡하다 = a tight schedule",1,"adjective"],["주간지","weekly magazine","주간지를 읽다 = to read a weekly",0,"noun"],["곧잘","quite well; readily; fairly often","곧잘 하다 = to do (it) quite well",1,"adverb"],["과음하다","to drink too much (alcohol)","술을 과음하다 = to overdrink",1,"verb"],["접대","entertaining / receiving guests (esp. clients)","바이어 접대 = client entertainment",0,"noun"],["괜히","for no reason; needlessly; in vain","괜히 화내다 = to get angry for nothing",0,"adverb"],["타령","harping on about; a constant refrain","돈 타령을 하다 = to go on about money",0,"noun"],["손주","grandchild","첫 손주를 보다 = to have one's first grandchild",0,"noun"],["간만","a long while (since)","간만에 만나다 = to meet after a long time",1,"noun"],["표","(counter) unit / pack; ticket","홍삼 세 표 = three packs of red ginseng",0,"counter"],["일자리","job; employment position","일자리를 구하다 = to look for a job",0,"noun"],["옜다","here (you go); take it (handing something over)","옜다, 받아라 = here, take it",0,"interjection"],["보태다","to add (esp. money); chip in","돈을 보태다 = to chip in money",1,"verb"],["내밀다","to stick out; hold out; push forward","턱을 내밀다 = to jut out one's chin",1,"verb"],["장사","business; trade","장사가 잘 되다 = business goes well",0,"noun"],["깨작깨작하다","to pick at (food); do half-heartedly","밥을 깨작깨작하다 = to pick at one's food",0,"verb"],["눈치가 보이다","to feel self-conscious; worry about others' reactions","",1,"idiom"],["가뜩이나 (-은/는데)","as it is; on top of everything already","가뜩이나 바쁜데 = as if I'm not busy enough",1,"grammar"],["입을 틔우다","to help someone start to talk / open up","",0,"idiom"],["밥을 (한 술) 뜨다","to eat a little; grab a bite (a spoonful of rice)","얘, 밥 좀 뜨고 가지 = eat something before you go",0,"idiom"],["업어 키우다","to raise (a child) carried on one's back; bring up dotingly","",0,"idiom"]]},{"id":"ch1-r","title":"1과 · 읽기·말하기","sub":"비디오: 낮 플레이드","cards":[["가요계","the pop-music industry / scene","가요계에 데뷔하다 = to debut in the pop scene",1,"noun"],["근본적","fundamental; basic","근본적인 문제 = a fundamental problem",0,"noun"],["논란","controversy; dispute","논란이 일어나다 = a controversy arises",1,"noun"],["동시","simultaneity; the same time","동시에 = at the same time",1,"noun"],["립싱크","lip-sync","립싱크를 하다 = to lip-sync",0,"noun"],["말솜씨","speaking skill; eloquence","말솜씨가 좋다 = to be a good talker",0,"noun"],["오락","entertainment; amusement","오락 프로그램 = entertainment program",0,"noun"],["증거","evidence; proof","증거를 찾다 = to find evidence",0,"noun"],["가꾸다","to cultivate; groom","외모를 가꾸다 = to groom one's appearance",1,"verb"],["끊이다","to cease; be interrupted","웃음이 끊이지 않다 = laughter never stops",0,"verb"],["맞추다","to match; set; adjust","음악에 맞추다 = to keep time with music",0,"verb"],["선호하다","to prefer","-을/를 선호하다 = to prefer (something)",0,"verb"],["열창하다","to sing passionately; belt out","무대에서 열창하다 = to belt out a song on stage",0,"verb"],["자랑하다","to boast; show off","실력을 자랑하다 = to show off one's skill",0,"verb"],["출연하다","to appear (in a show/film)","드라마에 출연하다 = to appear in a drama",1,"verb"],["키우다","to raise; grow; develop","실력을 키우다 = to build up one's skills",0,"verb"],["홍보하다","to promote; publicize","제품을 홍보하다 = to promote a product",0,"verb"],["격렬하다","to be intense; fierce","격렬한 경쟁 = fierce competition",1,"adjective"],["뛰어나다","to be outstanding; excellent","실력이 뛰어나다 = to be outstanding in skill",1,"adjective"],["열악하다","to be poor; substandard (conditions)","환경이 열악하다 = poor conditions",1,"adjective"],["인용의 출처 밝히기","stating the source of a quotation","-에 의하면/-에 따르면 -다고 하다",0,"grammar"],["연결 기능을 하는 인용 표현의 준말","contracted quotation forms (connectives)","-다면서 / -다니까 / -다는데",0,"grammar"],["개봉","(film) release; opening","영화가 개봉하다 = a film is released",0,"noun"],["관람","viewing; watching","영화 관람 = movie viewing",0,"noun"],["눈물바다","a sea of tears","눈물바다가 되다 = to turn into a sea of tears",0,"noun"],["달리기","running","달리기를 하다 = to run / go running",0,"noun"],["대사","lines; dialogue","대사를 외우다 = to memorize lines",0,"noun"],["등급","grade; rank; rating","등급을 매기다 = to assign a rating",0,"noun"],["만족","satisfaction","만족을 느끼다 = to feel satisfied",0,"noun"],["말다툼","quarrel; argument","말다툼을 하다 = to have an argument",0,"noun"],["몸매","figure; body shape","몸매가 좋다 = to have a good figure",0,"noun"],["방귀","fart","방귀를 뀌다 = to fart",0,"noun"],["불 (弗)","dollar","백만 불짜리 = worth a million dollars",0,"noun"],["상영","screening (of a film)","상영 중 = now showing",0,"noun"],["수준","level; standard","수준이 높다 = to be high-level",1,"noun"],["자폐증","autism","자폐증을 앓다 = to have autism",0,"noun"]]},{"id":"ch2-v","title":"2과 · 비디오","sub":"비디오: 낮 플레이드","cards":[["동고동락하다","to share joys and sorrows; go through thick and thin","친구와 동고동락하다 = to share everything with a friend",1,"verb"],["복지관","community welfare center","복지관에 다니다 = to attend a welfare center",0,"noun"],["코치","coach","코치를 맡다 = to take on a coaching role",0,"noun"],["노친네","old person; old-timer (informal)","동네 노친네 = an old-timer in the neighborhood",0,"noun"],["실버 스포츠","silver sports (sports for seniors)","실버 스포츠를 즐기다 = to enjoy senior sports",0,"noun"],["뜨다","to rise; become popular","시간이 뜨다 = to have a gap of free time",1,"verb"],["유망주","a rising star; promising prospect","기대되는 유망주 = a promising prospect",0,"noun"],["어마무시하다","to be enormous / tremendous; mind-blowing","어마무시한 실력 = mind-blowing skill",1,"adjective"],["엎드리다","to lie face down; bend down","책상에 엎드리다 = to lie on the desk",1,"verb"],["기본기","basic skills; fundamentals","기본기를 다지다 = to build up the basics",1,"noun"],["영업","business; sales","영업을 하다 = to run a business",0,"noun"],["누님","older sister (respectful form of 누나)","누님, 오랜만이에요 = long time no see, sister",0,"noun"],["허전하다","to feel empty / hollow; miss something","마음이 허전하다 = to feel a hollow heart",1,"adjective"],["알바(를) 뛰다","to work a part-time job","방학에 알바를 뛰다 = to work part-time over break",0,"expression"],["목이 좋다","to be a good (business) location / spot","목이 좋은 가게 = a well-located shop",1,"idiom"],["이래 봬도","even though it looks this way; despite appearances","이래 봬도 왕년엔… = despite how I look, back in the day…",1,"expression"],["뚝 떨어지다","to drop sharply; fall suddenly","성적이 뚝 떨어지다 = grades drop sharply",0,"expression"],["허파에 바람이 덜 빠지다","(lit.) the air hasn't fully left the lungs — still full of oneself","",1,"idiom"],["기가 막히게","amazingly; incredibly (well)","기가 막히게 잘하다 = to do it incredibly well",1,"expression"]]},{"id":"ch2-r","title":"2과 · 읽기·말하기 (1–2과)","sub":"비디오: 낮 플레이드","cards":[["장르","genre","장르가 다양하다 = a wide range of genres",0,"noun"],["재능","talent","재능이 있다 = to be talented",0,"noun"],["조연","supporting role","조연을 맡다 = to play a supporting role",0,"noun"],["주연","lead role","주연을 맡다 = to play the lead",0,"noun"],["지능","intelligence","지능이 높다 = to have high intelligence",0,"noun"],["집착","obsession; attachment","-에 집착하다 = to be obsessed with",0,"noun"],["출연","appearance (on a show)","특별 출연 = special appearance",0,"noun"],["후반부","the latter half; second part","후반부에 = in the latter half",0,"noun"],["괴로워하다","to suffer; be distressed","혼자 괴로워하다 = to suffer alone",1,"verb"],["착각하다","to be mistaken; be under a delusion","-으로 착각하다 = to mistake for",0,"verb"],["훌쩍거리다","to sniffle; sob","코를 훌쩍거리다 = to sniffle",0,"verb"],["귀찮다","to be bothersome / annoying","귀찮아하다 = to find bothersome",0,"adjective"],["불성실하다","to be insincere; unfaithful","태도가 불성실하다 = an insincere attitude",0,"adjective"],["뻔하다","to be obvious; predictable","뻔한 결말 = a predictable ending",1,"adjective"],["순수하다","to be pure; innocent","순수한 마음 = a pure heart",1,"adjective"],["어색하다","to be awkward","분위기가 어색하다 = an awkward mood",1,"adjective"],["허술하다","to be shabby; careless; flimsy","계획이 허술하다 = a sloppy plan",1,"adjective"],["강추","a strong recommendation (slang)","강추하다 = to highly recommend",0,"noun"],["가슴이 찡하다","to be deeply moved; heart-touching","",1,"idiom"],["두 마리 토끼를 다 잡다","to catch two rabbits at once (two birds, one stone)","",1,"idiom"],["말이 필요 없다","needs no words; goes without saying","",1,"idiom"],["소문난 잔치에 먹을 것 없다","a much-hyped feast has nothing to eat (overhyped)","",1,"idiom"],["냇가","streamside; creekside","냇가에서 놀다 = to play by the stream",0,"noun"],["도깨비","goblin (dokkaebi)","도깨비가 나타나다 = a goblin appears",0,"noun"],["마음씨","disposition; heart / nature","마음씨가 곱다 = to be kind-hearted",1,"noun"],["박","gourd","박 씨 = a gourd seed",0,"noun"],["엉망","a mess; shambles","엉망이 되다 = to become a mess",1,"noun"],["욕심꾸러기","a greedy person","욕심꾸러기 같으니 = what a greedy one",1,"noun"],["유언","a will; last words","유언을 남기다 = to leave a will",1,"noun"],["자리","spot; seat","자리에 눕다 = to lie down / be bedridden",0,"noun"],["제비","swallow (bird)","제비가 날아오다 = a swallow flies in",0,"noun"],["청개구리","tree frog; (fig.) a contrarian","청개구리 같다 = to be contrary",0,"noun"],["푼","penny; farthing","한 푼도 없다 = to not have a penny",0,"noun"],["가져다주다","to bring (something to someone)","행복을 가져다주다 = to bring happiness",0,"verb"],["떠내려가다","to be washed away; float downstream","물에 떠내려가다 = to be swept away by water",0,"verb"],["물다","to bite; hold in the mouth","물어다 주다 = to fetch in the mouth",1,"verb"],["물려받다","to inherit; receive as a handover","재산을 물려받다 = to inherit wealth",1,"verb"],["부러뜨리다","to break; snap (something)","가지를 부러뜨리다 = to snap a branch",0,"verb"],["쫓겨나다","to be driven out; expelled","집에서 쫓겨나다 = to be kicked out of the house",1,"verb"],["쫓아내다","to drive out; kick out","집에서 쫓아내다 = to drive (someone) out",1,"verb"],["혼내다","to scold; tell off","아이를 혼내다 = to scold a child",1,"verb"],["놀랍다","to be surprising","놀랍게도 = surprisingly",0,"adjective"],["심술궂다","to be spiteful; mean; cantankerous","심술궂은 표정 = a spiteful look",0,"adjective"],["개굴개굴","ribbit (frog croaking)","개굴개굴 울다 = to croak (frog)",0,"adverb"],["정성껏","with all one's heart; devotedly","정성껏 돌보다 = to care for devotedly",1,"adverb"],["꼬르륵","growl / gurgle (empty-stomach sound)","배가 꼬르륵거리다 = one's stomach growls",0,"adverb"],["꾸벅꾸벅","nodding off (dozing)","꾸벅꾸벅 졸다 = to nod off",0,"adverb"],["뚝","abruptly (stopping); snap","뚝 그치다 = to stop abruptly",0,"adverb"],["벌떡","springing up abruptly","벌떡 일어나다 = to jump to one's feet",0,"adverb"],["벌컥벌컥","gulping (drinking in big swigs)","물을 벌컥벌컥 마시다 = to gulp down water",0,"adverb"],["빙빙","round and round; spinning","빙빙 돌다 = to spin around",0,"adverb"]]},{"id":"ch3-v","title":"3과 · 비디오","sub":"비디오: 낮 플레이드","cards":[["덕 (~덕에)","thanks to; owing to","어머님 덕에 = thanks to mother",1,"noun"],["누리다","to enjoy (benefits, luxury)","사치를 누리다 = to enjoy luxury",1,"verb"],["어쨌든","anyway; anyhow","어쨌든 가야 한다 = anyway, we have to go",0,"adverb"],["복직하다","to return to work; be reinstated","회사에 복직하다 = to return to one's job",1,"verb"],["떠넘기다","to shift / pass off (responsibility) onto someone","책임을 떠넘기다 = to pass off responsibility",1,"verb"],["효도","filial piety; being good to one's parents","효도를 하다 = to be a good child to one's parents",0,"noun"],["예민하다","to be sensitive","예민한 사람 = a sensitive person",1,"adjective"],["룰","rule","룰을 지키다 = to follow the rules",0,"noun"],["제한","limit; restriction","제한 시간 = time limit",0,"noun"],["막","just (now); recklessly / at random","막 잠들다 = to have just fallen asleep",1,"adverb"],["화상","a burn (injury)","화상을 입다 = to get burned",0,"noun"],["순간적","momentary; instantaneous","순간적으로 = in an instant",1,"noun"],["기절하다","to faint; pass out","놀라서 기절하다 = to faint from shock",0,"verb"],["응급실","emergency room","응급실에 실려 가다 = to be rushed to the ER",0,"noun"],["말대꾸","talking back; retort","말대꾸를 하다 = to talk back",0,"noun"],["(○○ 씨) 말로는 ~대요","according to (someone); (someone) says that ~","의사 말로는 괜찮대요 = the doctor says it's fine",1,"grammar"]]},{"id":"ch3-r","title":"3과 · 읽기·말하기 (2–3과)","sub":"비디오: 낮 플레이드","cards":[["뻘뻘","profusely (e.g. sweating buckets)","땀을 뻘뻘 흘리다 = to sweat buckets",0,"adverb"],["쑥","(thrusting) out all at once; abruptly","쑥 내밀다 = to thrust out suddenly",0,"adverb"],["웅성웅성","murmuring; buzzing (of a crowd)","웅성웅성 떠들다 = to buzz with chatter",0,"adverb"],["쾅","bang; slam (loud crash)","문을 쾅 닫다 = to slam a door",0,"adverb"],["쿨쿨","sound of sleeping soundly","쿨쿨 자다 = to sleep soundly",0,"adverb"],["훌쩍훌쩍","sniffling; sobbing","훌쩍훌쩍 울다 = to sob",0,"adverb"],["고개","hill; mountain pass","고개를 넘다 = to cross over a pass",1,"noun"],["머릿수건","head towel; kerchief","머릿수건을 쓰다 = to wear a head kerchief",0,"noun"],["문틈","crack / gap in a door","문틈으로 보다 = to peek through a door crack",0,"noun"],["바보","fool; idiot","바보 같다 = to be foolish",0,"noun"],["밧줄","rope","밧줄을 잡다 = to grab a rope",0,"noun"],["오누이","brother and sister; siblings","오누이가 살다 = a brother and sister live (together)",1,"noun"],["쥐","mouse; rat","쥐가 나타나다 = a mouse appears",0,"noun"],["털","fur; (body) hair","털이 나다 = fur/hair grows",0,"noun"],["하느님","God (heavenly)","하느님께 빌다 = to pray to God",0,"noun"],["하늘나라","heaven; the heavenly kingdom","하늘나라로 가다 = to go to heaven",0,"noun"],["가리다","to cover; block; screen from view","얼굴을 가리다 = to cover one's face",1,"verb"],["끊어지다","to be cut off; snapped","줄이 끊어지다 = a rope snaps",0,"verb"],["내밀다","to stick out; thrust out","손을 내밀다 = to hold out one's hand",1,"verb"],["들여다보다","to peer into; look into","우물을 들여다보다 = to peer into a well",1,"verb"],["비치다","to be reflected; shine","우물에 비치다 = to be reflected in a well",0,"verb"],["소리치다","to shout; cry out","크게 소리치다 = to shout loudly",0,"verb"],["숨다","to hide (oneself)","뒤에 숨다 = to hide behind",0,"verb"],["쉬다","to grow hoarse","목소리가 쉬다 = one's voice goes hoarse",0,"verb"],["잡아먹다","to catch and eat; devour","토끼를 잡아먹다 = to prey on a rabbit",0,"verb"],["질리다","to be terrified / fed up","겁에 질리다 = to be paralyzed with fear",0,"verb"],["굵다","(of a voice) deep / low; thick","목소리가 굵다 = a deep voice",0,"adjective"],["깊다","to be deep","깊은 산속 = deep in the mountains",0,"adjective"],["뚝뚝","dripping drop by drop; snapping off","눈물이 뚝뚝 떨어지다 = tears fall drop by drop",1,"adverb"],["빙빙","round and round","빙빙 돌다 = to whirl around",1,"adverb"],["살금살금","stealthily; sneakily","살금살금 걷다 = to tiptoe",1,"adverb"],["어흥","roar (a tiger's growl)","어흥 하고 울다 = to roar",0,"adverb"],["잔뜩","fully; to the utmost; a whole lot","잔뜩 먹다 = to eat a whole lot",1,"adverb"],["쿵","thud; thump","쿵 넘어지다 = to fall with a thud",0,"adverb"],["쿵쿵","thump-thump (heavy pounding)","가슴이 쿵쿵 뛰다 = one's heart pounds",0,"adverb"],["독 안에 든 쥐","'a rat in a jar' — cornered with no escape","",0,"idiom"],["빙빙 돌다","to go round and round; beat around the bush","",0,"idiom"],["건전지","(dry cell) battery","건전지를 갈다 = to change the batteries",1,"noun"],["구멍","hole","구멍을 뚫다 = to bore a hole",0,"noun"],["눈꺼풀","eyelid","눈꺼풀이 무겁다 = one's eyelids are heavy",0,"noun"],["독소","toxin; poison","독소를 배출하다 = to expel toxins",0,"noun"],["린스","(hair) rinse; conditioner","린스로 헹구다 = to rinse with conditioner",0,"noun"],["망치","hammer","망치로 두드리다 = to hammer",0,"noun"],["모기","mosquito","모기에 물리다 = to get bitten by a mosquito",0,"noun"],["무좀","athlete's foot","무좀에 걸리다 = to get athlete's foot",0,"noun"],["물파스","liquid medicated pain ointment","물파스를 바르다 = to apply pain ointment",0,"noun"],["석유","petroleum; kerosene","석유를 넣다 = to add kerosene/fuel",0,"noun"],["습기","humidity; moisture","습기가 차다 = to become damp",0,"noun"],["여드름","acne; pimple","여드름이 나다 = to break out in pimples",0,"noun"],["열","fever; heat","열이 나다 = to run a fever",0,"noun"],["잉크","ink","잉크가 묻다 = to get ink on something",0,"noun"]]},{"id":"ch3-r2","title":"3과 · 읽기·말하기","sub":"비디오: 낮 플레이드","cards":[["진공청소기","vacuum cleaner","진공청소기를 돌리다 = to run the vacuum",0,"noun"],["탈모","hair loss","탈모가 심하다 = severe hair loss",1,"noun"],["호두","walnut","호두를 까다 = to crack a walnut",0,"noun"],["구기다","to crumple; wrinkle","종이를 구기다 = to crumple paper",0,"verb"],["달래다","to soothe; coax","아이를 달래다 = to soothe a child",0,"verb"],["묻다","(something) gets smeared / stained on","-이/가 -에 묻다 = to get on/stain",1,"verb"],["물리다","to be bitten","모기에 물리다 = to be bitten by a mosquito",0,"verb"],["변형되다","to be deformed; transformed","모양이 변형되다 = the shape gets deformed",0,"verb"],["사라지다","(something) disappears","흔적이 사라지다 = a trace disappears",1,"verb"],["없애다","to get rid of; eliminate","냄새를 없애다 = to get rid of a smell",0,"verb"],["제거하다","to remove; eliminate","얼룩을 제거하다 = to remove a stain",1,"verb"],["지우다","to erase","글씨를 지우다 = to erase writing",0,"verb"],["헹구다","to rinse","물로 헹구다 = to rinse with water",1,"verb"],["가렵다","to be itchy","등이 가렵다 = one's back is itchy",1,"adjective"],["덜하다","to be less (severe); lessen","통증이 덜하다 = the pain is less",0,"adjective"],["뚝","abruptly (stopping); drip","뚝 멈추다 = to stop abruptly",0,"adverb"],["서너","three or four","서너 개 = three or four (items)",0,"determiner"],["남극","the South Pole; Antarctic","남극 탐험 = Antarctic expedition",0,"noun"],["북극","the North Pole; Arctic","북극곰 = polar bear",0,"noun"],["사막","desert","사막을 건너다 = to cross a desert",0,"noun"],["적도","the equator","적도 부근 = near the equator",0,"noun"],["태평양","the Pacific Ocean","태평양을 건너다 = to cross the Pacific",0,"noun"],["가뭄","drought","가뭄이 들다 = a drought sets in",0,"noun"],["자외선","ultraviolet rays","자외선을 차단하다 = to block UV rays",0,"noun"],["해일","tidal wave; tsunami","해일이 덮치다 = a tsunami strikes",0,"noun"],["홍수","flood","홍수가 나다 = a flood occurs",0,"noun"],["황사","yellow (Asian) dust","황사가 심하다 = the yellow dust is bad",0,"noun"],["거미","spider","거미가 줄을 치다 = a spider spins a web",0,"noun"],["매미","cicada","매미가 울다 = cicadas chirp",0,"noun"],["바퀴벌레","cockroach","바퀴벌레가 나오다 = a cockroach appears",0,"noun"],["잠자리","dragonfly","잠자리를 잡다 = to catch a dragonfly",0,"noun"],["파리","fly","파리가 날다 = a fly buzzes around",0,"noun"],["공룡","dinosaur","공룡 화석 = dinosaur fossil",0,"noun"],["기린","giraffe","기린은 목이 길다 = giraffes have long necks",0,"noun"],["코끼리","elephant","코끼리 코 = an elephant's trunk",0,"noun"],["펭귄","penguin","펭귄이 헤엄치다 = a penguin swims",0,"noun"],["수컷 / 암컷","male / female (animal)","수컷과 암컷 = male and female",0,"noun"],["미각","taste","미각이 발달하다 = to have a keen sense of taste",0,"noun"],["시각","sight; vision","시각을 잃다 = to lose one's sight",0,"noun"],["청각","hearing","청각이 예민하다 = to have sharp hearing",0,"noun"],["촉각","touch","촉각이 예민하다 = to be sensitive to touch",0,"noun"],["후각","smell","후각이 발달하다 = to have a keen sense of smell",0,"noun"],["여드름","pimple; acne","여드름이 나다 = to get pimples",0,"noun"],["잠꼬대","sleep-talking","잠꼬대를 하다 = to talk in one's sleep",0,"noun"],["재채기","sneeze","재채기가 나다 = to sneeze",0,"noun"],["트림","burp","트림을 하다 = to burp",0,"noun"],["하품","yawn","하품이 나다 = to yawn",0,"noun"],["기억력","memory (ability to remember)","기억력이 좋다 = to have a good memory",1,"noun"],["뇌","brain","뇌를 자극하다 = to stimulate the brain",1,"noun"],["우뇌","the right brain","우뇌를 쓰다 = to use the right brain",0,"noun"],["좌뇌","the left brain","좌뇌가 발달하다 = the left brain develops",0,"noun"],["모국어","mother tongue; native language","모국어를 쓰다 = to use one's native language",0,"noun"],["발달","development","발달시키다 = to develop",0,"noun"],["변화","change","변화를 주다 = to make a change",0,"noun"],["스트레칭","stretching","스트레칭을 하다 = to stretch",0,"noun"],["양손","both hands","양손을 쓰다 = to use both hands",0,"noun"],["역할","role","역할을 하다 = to play a role",0,"noun"],["영향","influence; effect","영향을 미치다 = to have an influence",1,"noun"],["오감","the five senses","오감을 자극하다 = to stimulate the five senses",0,"noun"],["자극","stimulus; stimulation","자극을 주다 = to give stimulation",1,"noun"],["증진","promotion; enhancement","증진시키다 = to enhance",0,"noun"],["창의적","creative","창의적인 생각 = creative thinking",0,"noun"],["호기심","curiosity","호기심이 많다 = to be very curious",1,"noun"],["뜻하다","to mean; signify","뜻하지 않게 = unintentionally",0,"verb"],["박히다","to be embedded; stuck in","머리에 박히다 = to be etched in one's mind",0,"verb"],["벗어나다","to escape; break free from","틀에서 벗어나다 = to break out of the mold",0,"verb"],["자극하다","to stimulate","뇌를 자극하다 = to stimulate the brain",0,"verb"],["좌우하다","to influence; determine","결과를 좌우하다 = to determine the outcome",0,"verb"],["어리석다","to be foolish","어리석은 행동 = a foolish act",0,"adjective"],["지혜롭다","to be wise","지혜로운 사람 = a wise person",0,"adjective"],["침착하다","to be calm; composed","침착하게 대응하다 = to respond calmly",1,"adjective"],["결코","never; by no means (with a negative)","결코 포기하지 않다 = to never give up",0,"adverb"]]},{"id":"ch4-v","title":"4과 · 비디오","sub":"비디오: 낮 플레이드","cards":[["조회 수","view count (number of views)","조회 수가 높다 = to have high view counts",0,"noun"],["반응","reaction; response","반응이 뜨겁다 = the response is enthusiastic",1,"noun"],["입상","winning a prize; placing (in a contest)","입상(을) 하다 = to win a prize / place",1,"noun"],["내팽개치다","to fling away; abandon / neglect","일을 내팽개치다 = to throw one's work aside",0,"verb"],["노름하다","to gamble","노름하다 판돈을 잃다 = to lose one's stake gambling",0,"verb"],["어르신","elder; senior (respectful)","어르신을 모시다 = to look after an elder",0,"noun"],["조신하다","to be demure; modest; prudent","조신하게 행동하다 = to behave demurely",0,"adjective"],["여사(님)","madam; Mrs. (respectful for a woman)","김 여사님 = Madam Kim",0,"noun"],["성함","name (honorific for 이름)","성함이 어떻게 되세요? = may I have your name?",0,"noun"],["부문","sector; category; division","아마추어 부문 = amateur category",0,"noun"],["출전하다","to compete / take part (in a contest)","대회에 출전하다 = to enter a competition",1,"verb"],["며늘아기","(dear) daughter-in-law","우리 며늘아기 = our dear daughter-in-law",0,"noun"],["소원성취하다","to fulfill / achieve one's wish","소원성취하다 = to have one's wish come true",0,"verb"],["지경","a state / point (to the extent that)","죽을 지경이다 = to be at death's door / desperate",0,"noun"],["고혈압","high blood pressure","고혈압이 있다 = to have high blood pressure",0,"noun"],["건사하다","to look after; take care of; keep up","살림을 건사하다 = to keep house / manage a household",1,"verb"],["내기","a bet; wager","내기 당구를 치다 = to play billiards for a bet",0,"noun"],["비기다","to tie; draw (in a game)","경기가 비기다 = the match ends in a draw",1,"verb"],["-는 게 어디 있어요?","'How can there be ~?'; 'There's no such thing as ~'","갑자기 그만두는 게 어디 있어요? = you can't just quit!",0,"grammar"],["집안이 시끄럽다","the household is in turmoil","요즘 집안이 시끄럽다 = the family's in an uproar lately",1,"idiom"],["(의) 여신","goddess (of ~)","당구 여신 = goddess of billiards",0,"expression"],["총대를 메다","to take one for the team; shoulder a burden for the group","누군가 총대를 메다 = someone takes the lead/blame",1,"idiom"],["손(을) 쓰다","to take measures; do something about it","손을 쓸 수 없다 = nothing can be done",1,"idiom"],["걱정이 태산이다","to be worried sick (worries as big as a mountain)","",1,"idiom"],["여한이 없다","to have no regrets; nothing left to wish for","이제 여한이 없다 = I have no regrets now",1,"idiom"],["보자 보자 하니까","'since I keep letting it slide…'; I've tolerated enough","보자 보자 하니까 못 참겠다 = I've had enough of this",1,"expression"]]},{"id":"ch4-r","title":"4과 · 읽기·말하기","sub":"비디오: 낮 플레이드","cards":[["개성","individuality; character","개성이 강하다 = to have a strong individuality",1,"noun"],["경북","Gyeongbuk (North Gyeongsang Prov.)","경북 지역 = the Gyeongbuk region",0,"noun"],["경상남도","South Gyeongsang Province","경상남도 출신 = from South Gyeongsang",0,"noun"],["남성","male; men","남성 응답자 = male respondents",1,"noun"],["대구","Daegu (city)","대구에 살다 = to live in Daegu",0,"noun"],["만세","hurrah; long live","만세를 부르다 = to cry 'hurrah'",0,"noun"],["만세 삼창","three cheers of 'manse'","만세 삼창을 하다 = to give three cheers",0,"noun"],["삼세판","best of three (rounds)","삼세판으로 정하다 = to settle it best-of-three",0,"noun"],["시민","citizen(s)","시민 의식 = civic awareness",0,"noun"],["여론","public opinion","여론을 조사하다 = to survey public opinion",0,"noun"],["연령층","age group; age bracket","다양한 연령층 = various age groups",0,"noun"],["음주","drinking (alcohol)","음주 운전 = drunk driving",0,"noun"],["인구","population","인구가 많다 = to have a large population",1,"noun"],["전라남도","South Jeolla Province","전라남도 여행 = a trip to South Jeolla",0,"noun"],["전라북도","North Jeolla Province","전라북도 출신 = from North Jeolla",0,"noun"],["-에 걸치다","to span; extend over","전국에 걸치다 = to span the whole country",1,"verb"],["대표하다","to represent","한국을 대표하다 = to represent Korea",0,"verb"],["응답하다","to respond; answer","설문에 응답하다 = to respond to a survey",1,"verb"],["차지하다","to occupy; take up (a share)","1위를 차지하다 = to take first place",1,"verb"],["뚜렷하다","to be clear; distinct","차이가 뚜렷하다 = a clear difference",1,"adjective"],["참으로","truly; indeed","참으로 놀랍다 = truly surprising",0,"adverb"],["어쩔 수 없다","there's no choice; it can't be helped","",1,"idiom"],["틀에 박히다","to be stereotyped; rigid; set in a mold","틀에 박힌 생각 = stereotyped thinking",1,"idiom"],["경조사","family occasions (weddings & funerals)","경조사를 챙기다 = to attend to family events",0,"noun"],["경조사비","money given for family occasions","경조사비를 내다 = to give occasion money",0,"noun"],["노부부","an elderly couple","노부부가 살다 = an old couple lives (together)",0,"noun"],["대접","treatment; hospitality","대접을 받다 = to be treated / served",0,"noun"],["미움","hatred; dislike","미움을 받다 = to be disliked",0,"noun"],["부도","bankruptcy; default","부도가 나다 = to go bankrupt",0,"noun"],["상갓집","a house of mourning; funeral home","상갓집에 가다 = to go to a funeral home",0,"noun"],["상대적","relative; comparative","상대적으로 = relatively",0,"noun"],["순간적","momentary; instantaneous","순간적으로 = in an instant",0,"noun"],["시어머니","mother-in-law (husband's mother)","시어머니를 모시다 = to live with one's mother-in-law",0,"noun"],["식","way; manner (also: ceremony)","어떤 식으로든 = in one way or another",0,"noun"],["설문 조사 대상과 주제 밝히기","stating the survey's target and topic","-을/를 대상으로 -에 대해 설문 조사하다",0,"grammar"],["가장 많이 나온 의견 말하기","stating the most common opinion","-이/가 -%로 가장 많았습니다",0,"grammar"],["두 번째로 많이 나온 의견부터 순서대로 말하기","stating opinions in order from the 2nd most","그 다음으로는 -의 순이었습니다",0,"grammar"],["기타 의견 말하기","stating other / miscellaneous opinions","그 밖에 -다는 의견도 있었습니다",0,"grammar"],["설문 결과를 통해 알게 된 내용 설명하기","explaining what the survey results showed","이러한 결과를 통해 -을 알 수 있었습니다",0,"grammar"]]},{"id":"ch4-r2","title":"4과 · 정 (情) · 영업","sub":"비디오: 낮 플레이드","cards":[["실적","(business) performance; results","영업 실적 = sales performance",0,"noun"],["애정","affection; love","애정을 쏟다 = to pour out affection",0,"noun"],["약점","weak point; weakness","약점을 잡다 = to seize on a weakness",0,"noun"],["연봉","annual salary","연봉이 오르다 = one's salary rises",0,"noun"],["영업","sales; business operations","영업 사원 = a salesperson",0,"noun"],["일방적","one-sided; unilateral","일방적인 사랑 = one-sided love",0,"noun"],["정 (情)","affection; attachment (jeong)","정이 많다 = to be warm-hearted",0,"noun"],["정서","emotion; sentiment","정서가 안정되다 = to be emotionally stable",0,"noun"],["친근감","a sense of familiarity / closeness","친근감을 느끼다 = to feel a closeness",0,"noun"],["판매","selling; sales","판매왕 = top salesperson",1,"noun"],["고마워하다","to feel grateful","진심으로 고마워하다 = to be truly grateful",0,"verb"],["더불다","to be together with","이와 더불어 = along with this",0,"verb"],["들다","to enter; (of affection) to form","정이 들다 = to grow attached",0,"verb"],["반하다","to fall for; be captivated","첫눈에 반하다 = love at first sight",0,"verb"],["빠지다","to fall into; be immersed","사랑에 빠지다 = to fall in love",0,"verb"],["살펴보다","to look into; examine","자세히 살펴보다 = to look closely",0,"verb"],["설명되다","to be explained","-으로 설명되다 = to be explained as",0,"verb"],["쌓다","to pile up; accumulate; build","정을 쌓다 = to build a bond",0,"verb"],["유지되다","to be maintained","관계가 유지되다 = a relationship is maintained",0,"verb"],["이루어지다","to be achieved; be made up of","-으로 이루어지다 = to be composed of",1,"verb"],["정의되다","to be defined","-으로 정의되다 = to be defined as",1,"verb"],["챙기다","to take care of; look after; pack","가족을 챙기다 = to look after family",0,"verb"],["밉다","to be hateful; dislikable","미운 정 = affection born of dislike",1,"adjective"],["질기다","to be tough; chewy","질긴 인연 = a tenacious tie",0,"adjective"],["허전하다","to feel empty; hollow; lonely","마음이 허전하다 = to feel empty inside",1,"adjective"],["단순히","simply; merely","단순히 -일 뿐 = merely ~",1,"adverb"],["서서히","gradually; slowly","서서히 변하다 = to change gradually",1,"adverb"],["과언이 아니다","it is no exaggeration (to say)","",0,"idiom"],["첫눈에 반하다","to fall in love at first sight","",0,"idiom"],["정을 쌓다","to build up affection / a bond","",0,"idiom"],["정이 들다","to grow attached; develop affection","",1,"idiom"]]},{"id":"ch5-v","title":"5과 · 비디오","sub":"성격 · 심리 · 사무실 · 비디오: 대화의 희열","cards":[["허기지다","to be famished","하루 종일 굶어서 완전히 허기졌어요.",1,"verb"],["현지","the local area; on-site","여행 가면 현지 음식을 꼭 먹어 봐요.",0,"noun"],["극기 훈련","endurance training","말이 배낭여행이지, 유럽 극기 훈련이야.",0,"noun"],["한겨울","midwinter","한겨울에 바다에서 수영을 했어요.",0,"noun"],["떼","flock; swarm","광장에 비둘기 떼가 모여 있었다.",0,"noun"],["휭휭","whoosh (wind sound)","찬 바람이 휭휭 불었다.",0,"adverb"],["쫓다","to chase (away)","비둘기를 쫓느라 팔을 휘둘렀다.",0,"verb"],["강제","force; compulsion","강제로 시키면 오히려 하기 싫어져요.",0,"noun"],["이주","migration; relocation","주민들이 강제로 이주당했다.",0,"noun"],["초췌하다","haggard; worn out","여행 마지막 날에는 얼굴이 초췌해 보였다.",1,"adjective"],["탁","with a sudden pop","참았던 웃음이 탁 나왔다.",0,"adverb"],["관광청","tourism office","관광청에서 무료 지도를 나눠 준다.",0,"noun"],["장기 여행","long-term trip","장기 여행은 짐을 가볍게 싸야 한다.",0,"noun"],["훑다","to skim; scan over","가이드북을 처음부터 끝까지 훑어 봤다.",1,"verb"],["넓히다","to broaden; widen","여행은 시야를 넓히는 좋은 방법이다.",1,"verb"],["예리하다","sharp; keen","그 기자는 질문이 아주 예리하다.",1,"adjective"],["의외로","unexpectedly","그 호텔은 의외로 조용하고 좋았다.",1,"adverb"],["공간감","sense of space","이 사진은 공간감이 잘 느껴진다.",0,"noun"],["닳다","to wear out","오래 걸어서 신발 밑창이 닳았다.",0,"verb"],["재현","reenactment; reproduction","전통 혼례 재현 행사가 열렸다.",0,"noun"],["쬐다","to bask in (sunlight)","고양이가 햇볕을 쬐고 있다.",1,"verb"],["조그맣다","tiny; little","조그맣고 예쁜 카페를 발견했다.",0,"adjective"],["부엉이","owl","밤에 부엉이 우는 소리가 들렸다.",0,"noun"],["파드닥거리다","to flutter; flap","새가 파드닥거리며 날아올랐다.",0,"verb"],["강렬하다","intense; powerful","첫인상이 아주 강렬했다.",1,"adjective"],["말이 -(이)지","'it's called X, but really…'","말이 배낭여행이지, 유럽 극기 훈련이야.",1,"grammar"],["-을/를 통틀어(서)","throughout; all told","긴 여행을 통틀어서 남는 건 한 순간인 것 같거든요.",1,"grammar"]]},{"id":"ch5-r","title":"5과 · 읽기·말하기","sub":"성격 · 심리 · 사무실 · 비디오: 대화의 희열","cards":[["객관적","objective","객관적인 기준이 필요하다.",1,"noun"],["검사","test; examination","심리 검사를 받아 봤다.",0,"noun"],["기준","standard; criterion","평가 기준이 명확해야 한다.",1,"noun"],["별자리","constellation; star sign","네 별자리는 뭐야?",0,"noun"],["분석적","analytical","그는 분석적 사고에 강하다.",1,"noun"],["사물","object; thing","아이들은 사물을 색으로 기억한다.",1,"noun"],["에너지","energy","오늘은 에너지가 넘친다.",1,"noun"],["외부","outside; external","외부 의견도 들어 봐야 한다.",1,"noun"],["이론","theory","이론과 현실은 다르다.",0,"noun"],["현실적","realistic","좀 더 현실적인 계획을 세우자.",1,"noun"],["혈액형","blood type","혈액형으로 성격을 말하는 건 과학적이지 않다.",0,"noun"],["효율적","efficient","시간을 효율적으로 쓰고 싶다.",1,"noun"],["맺다","to form (a bond)","새 동료와 좋은 관계를 맺었다.",1,"verb"],["파악하다","to grasp; figure out","문제의 원인을 파악해야 한다.",1,"verb"],["흔들리다","to be shaken; waver","그 말에 마음이 흔들렸다.",0,"verb"],["신중하다","careful; prudent","그는 결정할 때 아주 신중하다.",1,"adjective"],["겸손하다","humble; modest","그분은 실력이 있는데도 겸손하다.",1,"adjective"],["까다롭다","picky; demanding","우리 부장님은 입맛이 까다롭다.",1,"adjective"],["꼼꼼하다","meticulous","서류를 꼼꼼하게 확인했다.",1,"adjective"],["단순하다","simple-minded; uncomplicated","성격이 단순해서 금방 잊어버린다.",1,"adjective"],["털털하다","easygoing; laid-back","언니는 성격이 털털해서 편하다.",1,"adjective"],["보수적이다","conservative","아버지는 생각이 좀 보수적이다.",1,"adjective"],["변덕스럽다","fickle; moody","봄 날씨는 변덕스럽다.",1,"adjective"],["시원시원하다","refreshingly frank","대답이 시원시원해서 좋다.",1,"adjective"],["싫증을 잘 내다","to get bored easily","동생은 뭐든지 싫증을 잘 낸다.",1,"expression"],["예술 감각이 있다","to have an artistic sense","옷 입는 걸 보면 예술 감각이 있다.",1,"expression"],["융통성이 있다","to be flexible","그는 융통성이 있어서 일하기 편하다.",1,"expression"],["이기적이다","selfish","자기 생각만 하는 건 이기적이다.",1,"adjective"],["이성적이다","rational","감정보다 이성적으로 판단하는 편이다.",1,"adjective"],["직선적이다","blunt; direct","그는 직선적이라서 가끔 상처를 준다.",1,"adjective"],["차분하다","calm; composed","목소리가 차분해서 듣기 좋다.",1,"adjective"],["나름","one's own way; depending","사람마다 나름대로 이유가 있다.",1,"noun"],["방해","disturbance; interruption","일하는데 방해가 되고 싶지 않다.",0,"noun"],["서류함","document cabinet","서류함에 계약서를 넣어 두었다.",0,"noun"],["소용","use; avail","후회해도 소용이 없다.",0,"noun"],["아이디어","idea","회의에서 좋은 아이디어가 나왔다.",0,"noun"],["이상적","ideal","이상적인 직장은 어떤 곳일까?",0,"noun"],["조직적","organized; systematic","그 팀은 조직적으로 움직인다.",1,"noun"],["책장","bookshelf","책장을 새로 정리했다.",0,"noun"],["결재하다","to approve (a document)","부장님이 서류를 결재해 주셨다.",0,"verb"],["대처하다","to cope with; respond to","위기에 빠르게 대처했다.",0,"verb"],["비다","to be empty","오후에는 회의실이 비어 있다.",0,"verb"],["여기다","to consider; regard","그 일을 자랑스럽게 여긴다.",1,"verb"],["재충전하다","to recharge (oneself)","주말에 푹 쉬며 재충전했다.",0,"verb"],["처리하다","to handle; process","밀린 일을 오늘 다 처리했다.",1,"verb"],["틀어박히다","to hole up; shut oneself in","주말 내내 방에 틀어박혀 있었다.",0,"verb"],["해내다","to pull off; accomplish","어려운 프로젝트를 결국 해냈다.",0,"verb"],["허비하다","to waste (time)","시간을 허비하지 말자.",0,"verb"],["흩어 놓다","to scatter about","책상 위에 서류를 흩어 놓았다.",1,"verb"],["깔끔하다","neat; tidy","보고서가 깔끔하게 정리됐다.",1,"adjective"],["어지럽다","dizzy; messy","책상이 어지럽다.",1,"adjective"],["도무지","not at all; utterly","무슨 말인지 도무지 모르겠다.",1,"adverb"],["모처럼","after a long while; for once","모처럼 쉬는 날인데 푹 쉬세요.",1,"adverb"],["절레절레","shaking one's head","고개를 절레절레 흔들었다.",0,"adverb"],["철저히","thoroughly","계획을 철저히 준비했다.",1,"adverb"],["녹초가 되다","to be wiped out; exhausted","야근을 하고 녹초가 되었다.",1,"idiom"],["소귀에 경 읽기","preaching to deaf ears","아무리 말해도 소귀에 경 읽기다.",1,"idiom"]]},{"id":"ch6-v","title":"6과 · 비디오","sub":"저출산 · 교육 · 비디오: 안녕하세요?","cards":[["직책","position; post","회사에서 직책이 뭐예요?",0,"noun"],["정시 퇴근","leaving work on time","우리 회사는 정시 퇴근이 어렵다.",1,"noun"],["인형 탈","mascot costume","인형 탈을 쓰고 행사에서 일했다.",0,"noun"],["관리직","managerial position","관리직으로 승진했다.",0,"noun"],["흔히","commonly; often","흔히 워라밸이라고 하잖아요.",1,"adverb"],["워라밸","work-life balance","워라밸을 지키고 싶어요.",0,"noun"],["와닿다","to hit home; resonate","그 말이 마음에 와닿았다.",1,"verb"],["반하다","to fall for","첫눈에 반했다.",1,"verb"],["본업","one's main job","본업은 따로 있고 이건 취미예요.",0,"noun"],["충실하다","faithful; devoted","본업에 충실한 것이 먼저다.",1,"adjective"],["벅차다","overwhelming; too much","혼자 하기에는 일이 벅차다.",1,"adjective"],["주인 의식","sense of ownership","주인 의식을 갖고 일해야 한다.",0,"noun"],["고통","pain; suffering","고통을 받는 사람들을 도와야 한다.",0,"noun"],["사업상","for business (reasons)","사업상 만난 사이예요.",0,"noun"],["끈끈하다","tight-knit; sticky","팀워크가 끈끈하다.",0,"adjective"],["지나치다","excessive","일에 대한 욕심이 지나치다.",1,"adjective"],["우정","friendship","오랜 우정을 지키고 싶다.",0,"noun"],["강요받다","to be pressured into","야근을 강요받았다.",0,"verb"],["괜한 소리를 하다","to say something needless","괜한 소리를 하셨네요.",1,"idiom"],["죽은 듯이 있다","to keep dead quiet","회의 시간이 되면 모두 죽은 듯이 있어요.",1,"idiom"],["말을 아끼다","to hold one's tongue","담당자가 돼 버리니까 말을 아껴요.",1,"idiom"],["혀를 내두르다","to be amazed; lost for words","혀를 내두를 정도로 일 중독이다.",1,"idiom"],["밸런스를 맞추다","to strike a balance","일과 삶의 밸런스를 맞추는 거예요.",0,"expression"],["기에 눌리다","to be overpowered by someone's presence","대표님의 기에 눌려 계신 것 같아요.",1,"idiom"]]},{"id":"ch6-r","title":"6과 · 읽기·말하기","sub":"저출산 · 교육 · 비디오: 안녕하세요?","cards":[["가사","housework","가사와 육아를 나눠서 한다.",0,"noun"],["고령","old age; advanced age","고령 운전자가 늘고 있다.",1,"noun"],["공교육","public education","공교육을 믿고 맡기고 싶다.",0,"noun"],["경기","economy; business conditions","경기 침체가 길어지고 있다.",0,"noun"],["기혼","married","기혼 여성의 경력 단절이 문제다.",0,"noun"],["대책","countermeasure","저출산 대책 마련이 시급하다.",1,"noun"],["보육","childcare","보육 시설이 부족하다.",0,"noun"],["사교육","private education","사교육 비용이 너무 많이 든다.",1,"noun"],["사상","in history; on record","출산율이 사상 최저를 기록했다.",1,"noun"],["성인","adult","성인이 되면 독립하고 싶다.",0,"noun"],["애","kid; baby","주말에는 애를 봐야 한다.",0,"noun"],["양립","having both; compatibility","일과 가정의 양립이 어렵다.",0,"noun"],["육아","child-rearing","육아는 부부가 함께 해야 한다.",1,"noun"],["정부","government","정부가 새 정책을 발표했다.",0,"noun"],["조기 유학","early study abroad","조기 유학을 보내는 부모가 많다.",1,"noun"],["지난해","last year","지난해보다 출산율이 떨어졌다.",0,"noun"],["출산","childbirth","출산율이 계속 낮아지고 있다.",1,"noun"],["통계","statistics","통계청 발표에 따르면 인구가 줄었다.",0,"noun"],["평균","average","평균 수명이 길어졌다.",0,"noun"],["허용","permission; allowance","반려동물 출입을 허용하는 카페다.",0,"noun"],["그치다","to stop; remain at","출산율 하락이 그치지 않는다.",0,"verb"],["꼽다","to pick (as the top); count","전문가들은 비용을 첫째 원인으로 꼽는다.",1,"verb"],["기록하다","to record","사상 최저치를 기록했다.",0,"verb"],["답하다","to answer","설문에 절반이 아니라고 답했다.",0,"verb"],["실시하다","to carry out; conduct","설문 조사를 실시했다.",0,"verb"],["증가하다","to increase","1인 가구가 증가하고 있다.",1,"verb"],["진입하다","to enter (a stage)","초고령 사회에 진입했다.",0,"verb"],["시급하다","urgent","대책 마련이 시급하다.",0,"adjective"],["급격히","rapidly; sharply","인구가 급격히 줄었다.",0,"adverb"],["초","super-; ultra- (prefix)","초고령화, 초스피드처럼 앞에 붙인다.",0,"determiner"],["오랜","long-standing","오랜 경기 침체가 이어졌다.",0,"determiner"],["초·중·고교생","elementary/middle/high schoolers","초·중·고교생 수가 줄고 있다.",0,"noun"],["-(으)므로","since; as (formal reason)","출산율이 낮으므로 대책이 필요합니다.",1,"grammar"],["-(으)ㄴ/는 데다가","on top of being…","물가가 비싼 데다가 집값도 높습니다.",1,"grammar"],["-다든지 -다든지 하다","doing things like A or B","지원금을 늘린다든지 시설을 짓는다든지 해야 합니다.",0,"grammar"],["만약 -(으)ㄹ 경우","in the event that…","만약 정책이 실패할 경우 문제가 커질 수 있습니다.",0,"grammar"],["전적으로 동의하다","to agree completely","저도 그 의견에 전적으로 동의합니다.",0,"expression"],["과외","private tutoring","과외를 두 개나 받는다.",1,"noun"],["거부","refusal; rejection","새 제도에 거부감을 느낀다.",0,"noun"],["교육열","education fever","한국의 교육열은 유명하다.",0,"noun"],["구조","structure","사회 구조가 바뀌어야 한다.",0,"noun"],["국가적","national","국가적 차원의 문제다.",0,"noun"],["국내","domestic","국내 대학에 진학하기로 했다.",0,"noun"],["기러기아빠","'goose dad' (father living apart to fund study abroad)","기러기아빠 생활이 벌써 삼 년째다.",1,"noun"],["낭비","waste","시간 낭비라고 생각한다.",1,"noun"],["맹모삼천지교","Mencius' mother moved three times (devotion to education)","맹모삼천지교라는 말이 있을 정도다.",0,"idiom"],["문제점","problem (point)","이 제도는 여러 문제점을 낳았다.",0,"noun"],["비용","cost; expense","교육 비용이 만만치 않다.",1,"noun"],["어학연수","language study abroad","방학에 어학연수를 다녀왔다.",0,"noun"],["언론","the press; media","언론에 크게 보도되었다.",0,"noun"],["열의","enthusiasm; zeal","부모들의 교육 열의가 대단하다.",0,"noun"],["위주","centered on","학벌 위주의 사회를 바꿔야 한다.",0,"noun"],["이익","profit; benefit","자식의 이익을 먼저 생각한다.",0,"noun"],["자식","one's children","자식 교육에 아낌없이 쓴다.",0,"noun"],["적응력","adaptability","아이들은 적응력이 빠르다.",0,"noun"],["제도","system","교육 제도를 개선해야 한다.",1,"noun"],["정상화","normalization","공교육 정상화가 목표다.",0,"noun"],["차원","level; dimension","정부 차원의 지원이 필요하다.",0,"noun"],["해결책","solution","근본적인 해결책을 찾자.",0,"noun"],["마련하다","to arrange; come up with","대책을 마련해야 한다.",0,"verb"],["받아들이다","to accept","현실을 받아들이기 어려웠다.",0,"verb"],["보도되다","to be reported","그 소식이 크게 보도되었다.",0,"verb"],["습득하다","to acquire (a skill/language)","언어를 빨리 습득하는 편이다.",0,"verb"],["바람직하다","desirable","바람직한 교육이란 무엇일까?",1,"adjective"],["유리하다","advantageous","외국어 능력은 취업에 유리하다.",1,"adjective"],["팽팽하다","evenly matched; taut","찬반 의견이 팽팽하다.",1,"adjective"],["대단히","greatly; extremely","대단히 죄송합니다.",0,"adverb"],["종종","from time to time","종종 연락하고 지내요.",0,"adverb"],["별 차이가 없다","to make little difference","두 방법은 별 차이가 없다.",1,"idiom"],["영향을 미치다","to have an influence on","부모의 태도가 아이에게 영향을 미친다.",1,"expression"],["일리가 있다","to have a point","그 말도 일리가 있다.",1,"idiom"],["입장을 밝히다","to state one's position","정부가 공식 입장을 밝혔다.",1,"expression"],["정체성을 갖추다","to establish an identity","자기만의 정체성을 갖추는 것이 중요하다.",1,"expression"]]},{"id":"ch7-v","title":"7과 · 비디오","sub":"호칭 · 몸짓언어 · 비디오: 플라스틱 (1)","cards":[["위생","hygiene","위생적으로 안전한 포장이다.",0,"noun"],["생필품","daily necessities","생필품이 떨어져서 장을 봐야 한다.",0,"noun"],["채워지다","to be filled","냉장고가 금방 채워졌다.",0,"verb"],["순식간","an instant; blink of an eye","순식간에 다 팔렸다.",0,"noun"],["여러모로","in many ways","플라스틱은 여러모로 유용하다.",1,"adverb"],["심지어","even; what's more","심지어 과일도 비닐에 싸여 있다.",1,"adverb"],["꾹","firmly (press)","버튼을 꾹 눌러 보세요.",0,"adverb"],["훼손되다","to be damaged","웬만해선 상품이 훼손될 일 없습니다.",1,"verb"],["장보기","grocery shopping","일주일치 장보기를 끝냈다.",0,"noun"],["망","net (bag)","양파는 망에 담아서 판다.",0,"noun"],["재택근무","working from home","오늘은 재택근무 하는 날이다.",0,"noun"],["반조리","semi-cooked; ready-to-cook","반조리 식품으로 저녁을 해결했다.",0,"noun"],["꺼림칙하다","uneasy; iffy","일회용품을 쓸 때마다 꺼림칙하다.",1,"adjective"],["교체되다","to be replaced","낡은 부품이 새것으로 교체되었다.",1,"verb"],["용기","container","플라스틱 용기에 담아 준다.",0,"noun"],["합성","synthetic","합성 플라스틱으로 만든 제품이다.",0,"noun"],["유용하다","useful","비닐봉지는 확실히 유용하다.",1,"adjective"],["푸짐하다","generous; hearty (amount)","반찬이 푸짐하게 나온다.",1,"adjective"],["집밥","home-cooked meal","오랜만에 집밥을 먹었다.",0,"noun"],["조물주","the Creator","조물주가 빚은 듯한 완벽한 재료다.",0,"noun"],["치우다","to clear away","다 먹은 그릇을 치웠다.",1,"verb"],["뜯다","to tear open","택배 상자를 뜯었다.",1,"verb"],["전락하다","to be reduced to","한순간에 쓰레기로 전락하고 만다.",0,"verb"],["-당","per","1인당 플라스틱 사용량이 많다.",0,"counter"],["헹구다","to rinse","용기를 깨끗이 헹궈서 배출한다.",1,"verb"],["도리","duty; (no) other way","달리 도리가 없었다.",1,"noun"],["보기 좋은 떡이 먹기에 좋다","what looks good tastes good","보기 좋은 떡이 먹기에 좋다는 말이 있다.",0,"idiom"],["이것저것 없는 게 없다","to have everything under the sun","마트에는 이것저것 없는 게 없다.",1,"idiom"],["웬만해서는 -는 일 없다","hardly ever happens","만져 보고 눌러 봐도 웬만해선 훼손될 일 없습니다.",1,"grammar"],["-(으)랴 -(으)랴","busy doing A and B","살림하랴 육아하랴 여유가 없습니다.",1,"grammar"],["-은/는 늘 뒷전이다","always on the back burner","자신은 늘 뒷전이죠.",0,"grammar"],["숨통이 트이다","to get breathing room","이거라도 있어야 좀 숨통이 트인다.",1,"idiom"],["믿는 구석이 있다","to have something to fall back on","믿는 구석이 있다면 재활용이 된다는 점이다.",1,"idiom"]]},{"id":"ch7-r","title":"7과 · 읽기·말하기","sub":"호칭 · 몸짓언어 · 비디오: 플라스틱 (1)","cards":[["망신","disgrace; humiliation","사람들 앞에서 망신을 당했다.",0,"noun"],["반응","reaction; response","고객들의 반응이 좋았다.",1,"noun"],["부","department","제품 개발부에서 일한다.",0,"noun"],["안색","complexion","안색이 안 좋아 보여요.",0,"noun"],["지칭","designation; referring term","상대를 지칭하는 말은 조심해야 한다.",0,"noun"],["직함","job title","명함에 직함이 적혀 있다.",1,"noun"],["호칭어","term of address","한국어는 호칭어가 복잡하다.",0,"noun"],["홍보","promotion; PR","해외 홍보팀으로 발령이 났다.",0,"noun"],["저지르다","to commit (a mistake)","큰 실수를 저질렀다.",1,"verb"],["못지않다","no less than; on par with","한국 사람 못지않게 잘한다.",1,"adjective"],["무례하다","rude","이름을 부르면 무례하게 들릴 수 있다.",1,"adjective"],["어설프다","clumsy; awkward","처음이라 솜씨가 어설프다.",0,"adjective"],["유창하다","fluent","그는 영어가 유창하다.",0,"adjective"],["사모님","madam (respectful)","사장님과 사모님께서 함께 오셨어요.",1,"noun"],["그쪽","'you' (neutral address)","그쪽 잘못이 아니에요.",1,"noun"],["저기요","excuse me (getting attention)","저기요, 이거 떨어뜨리셨어요.",1,"interjection"],["배워도 배워도 끝이 없다","learning never ends","한국어 호칭은 배워도 배워도 끝이 없다.",0,"idiom"],["뭐니 뭐니 해도","when all is said and done","뭐니 뭐니 해도 건강이 최고다.",1,"idiom"],["강의록","lecture notes","강의록을 빌려서 복사했다.",0,"noun"],["남미","South America","남미에서는 다른 뜻이 되는 몸짓이다.",0,"noun"],["동그라미","circle","손가락으로 동그라미를 만들었다.",1,"noun"],["동성연애","same-sex relationship","그 몸짓은 동성연애를 뜻하는 것으로 오해받았다.",0,"noun"],["몸짓언어","body language","나라마다 몸짓언어가 다르다.",0,"noun"],["문화권","cultural sphere","문화권마다 인사법이 다르다.",1,"noun"],["배경","background","문화적 배경을 알아야 이해할 수 있다.",1,"noun"],["보편적","universal","고개 끄덕임은 보편적인 몸짓일까?",1,"noun"],["비웃음","ridicule; sneer","비웃음을 살까 봐 걱정했다.",0,"noun"],["자세","posture","바른 자세로 앉으세요.",0,"noun"],["좌우","left and right","고개를 좌우로 흔들었다.",1,"noun"],["지중해","the Mediterranean","지중해 연안 나라들의 몸짓이 비슷하다.",0,"noun"],["턱","chin","턱을 괴고 이야기를 들었다.",0,"noun"],["팔짱","folded arms","팔짱을 끼고 서 있었다.",0,"noun"],["포옹","hug","가벼운 포옹으로 인사했다.",1,"noun"],["결합되다","to be combined","두 문화가 결합된 인사법이다.",0,"verb"],["고려하다","to consider","상대의 문화를 고려해야 한다.",1,"verb"],["굽히다","to bend; bow","허리를 굽혀 인사했다.",0,"verb"],["끄덕이다","to nod","고개를 끄덕이며 들었다.",0,"verb"],["끼다","to fold (arms); tuck","팔짱을 끼는 것은 실례일 수 있다.",0,"verb"],["뻗다","to stretch out","손을 앞으로 뻗었다.",0,"verb"],["찡그리다","to frown; scrunch up","얼굴을 찡그리지 마세요.",1,"verb"],["해석되다","to be interpreted","무례한 뜻으로 해석될 수 있다.",1,"verb"],["해석하다","to interpret","같은 몸짓도 문화마다 다르게 해석한다.",1,"verb"],["가볍다","light; slight","가볍게 고개를 숙였다.",0,"adjective"],["마주","face to face","마주 보고 앉았다.",0,"adverb"],["아무런","not any (whatsoever)","아무런 문제가 없다.",0,"determiner"],["잘돼 가다","to be going well","새 프로젝트는 잘돼 간다.",0,"expression"]]},{"id":"ch8-v","title":"8과 · 비디오","sub":"씨름 그림 · 묘사 · 비디오: 플라스틱 (2)","cards":[["분류","sorting; classification","쓰레기 분류가 생각보다 어렵다.",1,"noun"],["마개","cap; stopper","병 마개는 따로 버려야 한다.",0,"noun"],["압축","compression","페트병은 압축해서 버린다.",1,"noun"],["분리배출","separated waste disposal","분리배출 요일을 지켜 주세요.",1,"noun"],["공정","(manufacturing) process","재활용 공정에서 문제가 생겼다.",0,"noun"],["복합 재질","composite material","복합 재질은 재활용이 어렵다.",0,"noun"],["선별","sorting; screening","선별장에서 손으로 다시 나눈다.",0,"noun"],["종량제 봉투","pay-per-volume trash bag","종량제 봉투에 넣어 버리세요.",1,"noun"],["품목","item (category)","재활용 가능한 품목을 확인하자.",0,"noun"],["포장재","packaging material","포장재가 너무 많이 나온다.",0,"noun"],["난감하다","to be at a loss","어디에 버려야 할지 난감하다.",1,"adjective"],["날","blade","이물질이 기계의 날을 상하게 한다.",0,"noun"],["폐기되다","to be discarded","절반은 그냥 폐기된다.",0,"verb"],["관심도","level of interest","환경에 대한 관심도가 높아졌다.",0,"noun"],["한정하다","to limit (to)","대상을 페트병으로 한정했다.",1,"verb"],["추정","estimation","추정 수치일 뿐이다.",0,"noun"],["생활화","making a daily habit","분리배출의 생활화가 필요하다.",0,"noun"],["의아하다","puzzled; doubtful","왜 안 되는지 의아했다.",1,"adjective"],["치명타","fatal blow","재활용률에 치명타를 입혔다.",0,"noun"],["복구하다","to restore; recover","지워진 파일을 복구했다.",1,"verb"],["접근하다","to approach","문제에 다르게 접근해야 한다.",1,"verb"],["맞아떨어지다","to fit perfectly; add up","계산이 딱 맞아떨어졌다.",1,"verb"],["-(으)로 손에 꼽히다","to be counted among the best as…","재활용 전문가로 국내에서 손에 꼽히는 분이죠.",1,"idiom"],["문제를 일으키다","to cause trouble","알루미늄 조각이 공정에서 문제를 일으킨다.",1,"expression"],["-(으)면 끝이 아니다","it doesn't end with just…","분리수거함에 던져 버리면 끝이 아니었습니다.",0,"grammar"],["믿는 도끼에 발등 찍힌다","betrayed by what you trusted","믿는 도끼에 발등 찍힌다더니 딱 그 상황이다.",1,"idiom"]]},{"id":"ch8-r","title":"8과 · 읽기·말하기","sub":"씨름 그림 · 묘사 · 비디오: 플라스틱 (2)","cards":[["갓","gat (traditional horsehair hat)","갓을 쓴 구경꾼이 보인다.",0,"noun"],["구경꾼","onlooker; spectator","구경꾼들이 빙 둘러앉았다.",0,"noun"],["깍지","interlocked fingers","두 손을 깍지를 끼고 앉았다.",0,"noun"],["손등","back of the hand","손등으로 이마의 땀을 닦았다.",0,"noun"],["승부","match; the win","곧 승부가 난다.",1,"noun"],["씨름꾼","ssireum wrestler","두 씨름꾼이 맞붙었다.",0,"noun"],["악사","(traditional) musician","악사가 피리를 불고 있다.",0,"noun"],["안간힘","desperate effort","넘어지지 않으려고 안간힘을 쓴다.",0,"noun"],["율동","rhythmic movement","그림에서 율동감이 느껴진다.",0,"noun"],["입술","lips","입술을 꼭 다물었다.",0,"noun"],["편","side; team","너는 누구 편이야?",0,"noun"],["관찰하다","to observe","그림을 자세히 관찰해 보자.",1,"verb"],["넘어뜨리다","to knock down","상대를 넘어뜨리면 이긴다.",0,"verb"],["넘치다","to overflow; brim","그림에 생동감이 넘친다.",0,"verb"],["어우러지다","to blend together","사람들과 풍경이 잘 어우러진다.",0,"verb"],["장난치다","to play around","아이들이 장난치며 웃는다.",0,"verb"],["찌푸리다","to scrunch (one's face)","얼굴을 찌푸리며 안간힘을 쓴다.",1,"verb"],["삼각형","a triangle","케이크를 삼각형으로 잘랐다.",0,"noun"],["정사각형","a square","정사각형 모양의 액자다.",0,"noun"],["직사각형","a rectangle","직사각형 테이블을 샀다.",0,"noun"],["정육면체","a cube","주사위는 정육면체다.",0,"noun"],["원형","a circle; round shape","원형 탁자에 둘러앉았다.",0,"noun"],["원뿔형","a cone shape","아이스크림콘은 원뿔형이다.",0,"noun"],["원기둥형","a cylinder shape","통조림은 원기둥형이다.",0,"noun"],["타원형","an oval","타원형 거울을 걸었다.",0,"noun"],["둥글다","to be round","접시가 둥글다.",1,"adjective"],["유리","glass (material)","유리로 만든 컵이다.",1,"noun"],["나무","wood; a tree","나무로 만든 의자가 따뜻해 보인다.",0,"noun"],["금속","metal","금속으로 만들어져서 무겁다.",1,"noun"],["금","gold","금으로 만든 반지다.",0,"noun"],["은","silver","은으로 만든 수저를 쓴다.",0,"noun"],["철","iron","철로 만든 문은 아주 튼튼하다.",0,"noun"],["흙","soil; clay, earth","흙으로 만든 그릇이다.",0,"noun"],["플라스틱","plastic","플라스틱으로 만들어져서 가볍다.",1,"noun"],["천","cloth, fabric","천으로 만든 가방이다.",1,"noun"],["가죽","leather","가죽으로 만든 지갑이다.",1,"noun"],["딱딱하다","to be hard, stiff","의자가 딱딱해서 불편하다.",1,"adjective"],["부드럽다","to be soft, smooth","천이 아주 부드럽다.",1,"adjective"],["완만하다","gentle (slope)","완만한 언덕길이 이어진다.",0,"adjective"],["가파르다","steep","가파른 계단을 올랐다.",0,"adjective"],["평평하다","flat; level","길이 평평해서 걷기 좋다.",0,"adjective"],["울퉁불퉁하다","bumpy","길이 울퉁불퉁하다.",0,"adjective"],["구불구불하다","winding","구불구불한 산길을 달렸다.",0,"adjective"],["길쭉하다","longish; elongated","길쭉한 유리병에 꽃을 꽂았다.",0,"adjective"],["네모나다","square-shaped","네모난 상자에 담았다.",0,"adjective"],["푹신하다","cushy; soft","푹신한 소파에 앉았다.",0,"adjective"],["투명하다","transparent","투명한 유리로 만들어졌다.",0,"adjective"],["잔잔하다","calm (water)","바다가 잔잔하다.",0,"adjective"],["얕다","shallow","물이 얕아서 아이도 놀 수 있다.",0,"adjective"],["수평선","(sea) horizon","수평선 위로 해가 떠올랐다.",0,"noun"],["오르막길","uphill road","오르막길이라 자전거가 힘들다.",0,"noun"],["내리막길","downhill road","내리막길에서는 속도를 줄이세요.",0,"noun"],["가명","a false name (pen name)","가명으로 그림을 발표했다.",0,"noun"],["낙서","doodle; graffiti","벽에 낙서가 가득하다.",0,"noun"],["불안감","anxiety","음악이 불안감을 덜어 준다.",1,"noun"],["신경쇠약","nervous breakdown","신경쇠약에 시달렸다.",0,"noun"],["안정감","sense of stability","그림에서 안정감이 느껴진다.",0,"noun"],["의문","question; doubt","그 주장에 의문을 가졌다.",0,"noun"],["일부","a part; portion","작품 일부만 공개되었다.",0,"noun"],["정신과","psychiatry (department)","정신과 치료를 받았다.",1,"noun"],["즐거움","joy; pleasure","그림 그리는 즐거움을 알게 됐다.",0,"noun"],["지수","index; level","스트레스 지수가 높게 나왔다.",1,"noun"],["지적","intellectual","지적인 여성으로 그려졌다.",0,"noun"],["진실","truth","그림에 숨겨진 진실이 밝혀졌다.",1,"noun"],["회복","recovery","건강 회복을 빌었다.",1,"noun"],["감상하다","to appreciate (art)","미술관에서 그림을 감상했다.",0,"verb"],["다루다","to handle; deal with","이 작품은 죽음을 다루고 있다.",0,"verb"],["덜다","to relieve; lessen","걱정을 덜었다.",0,"verb"],["드러나다","to be revealed","숨은 의미가 드러났다.",0,"verb"],["떠올리다","to call to mind","고향을 떠올리며 그렸다.",0,"verb"],["앓다","to suffer from (an illness)","마음의 병을 앓았다.",1,"verb"],["재현하다","to reproduce; recreate","당시 모습을 재현했다.",0,"verb"],["해소되다","to be relieved","스트레스가 해소되었다.",1,"verb"],["해소하다","to relieve (stress)","그림으로 스트레스를 해소한다.",0,"verb"],["두렵다","fearful; dreaded","실패가 두려웠다.",1,"adjective"],["솔깃하다","tempted; intrigued","그 제안에 귀가 솔깃했다.",1,"adjective"],["폭넓다","broad; wide-ranging","폭넓은 사랑을 받았다.",1,"adjective"],["가늘다","thin; fine","붓의 선이 가늘다.",1,"adjective"],["둥그렇다","round","둥그렇게 모여 앉았다.",0,"adjective"],["흥겹다","merry; festive","잔치 분위기가 흥겹다.",1,"adjective"],["차츰","gradually","차츰 마음이 안정되었다.",0,"adverb"],["헤","with the mouth wide open (grinning)","입을 헤 벌리고 웃는다.",0,"adverb"]]}];
+const CHAPTERS = [{"id":"ch1","title":"1과","theme":""},{"id":"ch2","title":"2과","theme":""},{"id":"ch3","title":"3과","theme":""},{"id":"ch4","title":"4과","theme":""},{"id":"ch5","title":"5과","theme":"성격 · 심리 · 사무실"},{"id":"ch6","title":"6과","theme":"저출산 · 교육"},{"id":"ch7","title":"7과","theme":"호칭 · 몸짓언어"},{"id":"ch8","title":"8과","theme":"씨름 그림 · 묘사"}];           // [{id,title,theme}] - for the "whole chapter" dropdown group
+const CLASSES  = [{"suffix":"v","title":"비디오"},{"suffix":"r","title":"읽기·말하기"},{"suffix":"r2","title":"읽기·말하기 2"}];            // [{suffix,title}]   - for the "one class, all chapters" group
+const NOTES = {"__EX__":{"기왕":"if it's all the same, the better one","적금":"to pay into savings","빡빡하다":"a tight schedule","주간지":"to read a weekly","곧잘":"to do (it) quite well","과음하다":"to overdrink","접대":"client entertainment","괜히":"to get angry for nothing","타령":"to go on about money","손주":"to have one's first grandchild","간만":"to meet after a long time","표":"three packs of red ginseng","일자리":"to look for a job","옜다":"here, take it","보태다":"to chip in money","내밀다":"to hold out one's hand","장사":"business goes well","깨작깨작하다":"to pick at one's food","가뜩이나 (-은/는데)":"as if I'm not busy enough","밥을 (한 술) 뜨다":"eat something before you go","가요계":"to debut in the pop scene","근본적":"a fundamental problem","논란":"a controversy arises","동시":"at the same time","립싱크":"to lip-sync","말솜씨":"to be a good talker","오락":"entertainment program","증거":"to find evidence","가꾸다":"to groom one's appearance","끊이다":"laughter never stops","맞추다":"to keep time with music","선호하다":"to prefer (something)","열창하다":"to belt out a song on stage","자랑하다":"to show off one's skill","출연하다":"to appear in a drama","키우다":"to build up one's skills","홍보하다":"to promote a product","격렬하다":"fierce competition","뛰어나다":"to be outstanding in skill","열악하다":"poor conditions","개봉":"a film is released","관람":"movie viewing","눈물바다":"to turn into a sea of tears","달리기":"to run / go running","대사":"to memorize lines","등급":"to assign a rating","만족":"to feel satisfied","말다툼":"to have an argument","몸매":"to have a good figure","방귀":"to fart","불 (弗)":"worth a million dollars","상영":"now showing","수준":"to be high-level","자폐증":"to have autism","동고동락하다":"to share everything with a friend","복지관":"to attend a welfare center","코치":"to take on a coaching role","노친네":"an old-timer in the neighborhood","실버 스포츠":"to enjoy senior sports","뜨다":"to have a gap of free time","유망주":"a promising prospect","어마무시하다":"mind-blowing skill","엎드리다":"to lie on the desk","기본기":"to build up the basics","영업":"a salesperson","누님":"long time no see, sister","허전하다":"to feel empty inside","알바(를) 뛰다":"to work part-time over break","목이 좋다":"a well-located shop","이래 봬도":"despite how I look, back in the day…","뚝 떨어지다":"grades drop sharply","기가 막히게":"to do it incredibly well","장르":"a wide range of genres","재능":"to be talented","조연":"to play a supporting role","주연":"to play the lead","지능":"to have high intelligence","집착":"to be obsessed with","출연":"special appearance","후반부":"in the latter half","괴로워하다":"to suffer alone","착각하다":"to mistake for","훌쩍거리다":"to sniffle","귀찮다":"to find bothersome","불성실하다":"an insincere attitude","뻔하다":"a predictable ending","순수하다":"a pure heart","어색하다":"an awkward mood","허술하다":"a sloppy plan","강추":"to highly recommend","냇가":"to play by the stream","도깨비":"a goblin appears","마음씨":"to be kind-hearted","박":"a gourd seed","엉망":"to become a mess","욕심꾸러기":"what a greedy one","유언":"to leave a will","자리":"to lie down / be bedridden","제비":"a swallow flies in","청개구리":"to be contrary","푼":"to not have a penny","가져다주다":"to bring happiness","떠내려가다":"to be swept away by water","물다":"to fetch in the mouth","물려받다":"to inherit wealth","부러뜨리다":"to snap a branch","쫓겨나다":"to be kicked out of the house","쫓아내다":"to drive (someone) out","혼내다":"to scold a child","놀랍다":"surprisingly","심술궂다":"a spiteful look","개굴개굴":"to croak (frog)","정성껏":"to care for devotedly","꼬르륵":"one's stomach growls","꾸벅꾸벅":"to nod off","뚝":"to stop abruptly","벌떡":"to jump to one's feet","벌컥벌컥":"to gulp down water","빙빙":"to whirl around","덕 (~덕에)":"thanks to mother","누리다":"to enjoy luxury","어쨌든":"anyway, we have to go","복직하다":"to return to one's job","떠넘기다":"to pass off responsibility","효도":"to be a good child to one's parents","예민하다":"a sensitive person","룰":"to follow the rules","제한":"time limit","막":"to have just fallen asleep","화상":"to get burned","순간적":"in an instant","기절하다":"to faint from shock","응급실":"to be rushed to the ER","말대꾸":"to talk back","(○○ 씨) 말로는 ~대요":"the doctor says it's fine","뻘뻘":"to sweat buckets","쑥":"to thrust out suddenly","웅성웅성":"to buzz with chatter","쾅":"to slam a door","쿨쿨":"to sleep soundly","훌쩍훌쩍":"to sob","고개":"to cross over a pass","머릿수건":"to wear a head kerchief","문틈":"to peek through a door crack","바보":"to be foolish","밧줄":"to grab a rope","오누이":"a brother and sister live (together)","쥐":"a mouse appears","털":"fur/hair grows","하느님":"to pray to God","하늘나라":"to go to heaven","가리다":"to cover one's face","끊어지다":"a rope snaps","들여다보다":"to peer into a well","비치다":"to be reflected in a well","소리치다":"to shout loudly","숨다":"to hide behind","쉬다":"one's voice goes hoarse","잡아먹다":"to prey on a rabbit","질리다":"to be paralyzed with fear","굵다":"a deep voice","깊다":"deep in the mountains","뚝뚝":"tears fall drop by drop","살금살금":"to tiptoe","어흥":"to roar","잔뜩":"to eat a whole lot","쿵":"to fall with a thud","쿵쿵":"one's heart pounds","건전지":"to change the batteries","구멍":"to bore a hole","눈꺼풀":"one's eyelids are heavy","독소":"to expel toxins","린스":"to rinse with conditioner","망치":"to hammer","모기":"to get bitten by a mosquito","무좀":"to get athlete's foot","물파스":"to apply pain ointment","석유":"to add kerosene/fuel","습기":"to become damp","여드름":"to get pimples","열":"to run a fever","잉크":"to get ink on something","진공청소기":"to run the vacuum","탈모":"severe hair loss","호두":"to crack a walnut","구기다":"to crumple paper","달래다":"to soothe a child","묻다":"to get on/stain","물리다":"to be bitten by a mosquito","변형되다":"the shape gets deformed","사라지다":"a trace disappears","없애다":"to get rid of a smell","제거하다":"to remove a stain","지우다":"to erase writing","헹구다":"to rinse with water","가렵다":"one's back is itchy","덜하다":"the pain is less","서너":"three or four (items)","남극":"Antarctic expedition","북극":"polar bear","사막":"to cross a desert","적도":"near the equator","태평양":"to cross the Pacific","가뭄":"a drought sets in","자외선":"to block UV rays","해일":"a tsunami strikes","홍수":"a flood occurs","황사":"the yellow dust is bad","거미":"a spider spins a web","매미":"cicadas chirp","바퀴벌레":"a cockroach appears","잠자리":"to catch a dragonfly","파리":"a fly buzzes around","공룡":"dinosaur fossil","기린":"giraffes have long necks","코끼리":"an elephant's trunk","펭귄":"a penguin swims","수컷 / 암컷":"male and female","미각":"to have a keen sense of taste","시각":"to lose one's sight","청각":"to have sharp hearing","촉각":"to be sensitive to touch","후각":"to have a keen sense of smell","잠꼬대":"to talk in one's sleep","재채기":"to sneeze","트림":"to burp","하품":"to yawn","기억력":"to have a good memory","뇌":"to stimulate the brain","우뇌":"to use the right brain","좌뇌":"the left brain develops","모국어":"to use one's native language","발달":"to develop","변화":"to make a change","스트레칭":"to stretch","양손":"to use both hands","역할":"to play a role","영향":"to have an influence","오감":"to stimulate the five senses","자극":"to give stimulation","증진":"to enhance","창의적":"creative thinking","호기심":"to be very curious","뜻하다":"unintentionally","박히다":"to be etched in one's mind","벗어나다":"to break out of the mold","자극하다":"to stimulate the brain","좌우하다":"to determine the outcome","어리석다":"a foolish act","지혜롭다":"a wise person","침착하다":"to respond calmly","결코":"to never give up","조회 수":"to have high view counts","반응":"the response is enthusiastic","입상":"to win a prize / place","내팽개치다":"to throw one's work aside","노름하다":"to lose one's stake gambling","어르신":"to look after an elder","조신하다":"to behave demurely","여사(님)":"Madam Kim","성함":"may I have your name?","부문":"amateur category","출전하다":"to enter a competition","며늘아기":"our dear daughter-in-law","소원성취하다":"to have one's wish come true","지경":"to be at death's door / desperate","고혈압":"to have high blood pressure","건사하다":"to keep house / manage a household","내기":"to play billiards for a bet","비기다":"the match ends in a draw","-는 게 어디 있어요?":"you can't just quit!","집안이 시끄럽다":"the family's in an uproar lately","(의) 여신":"goddess of billiards","총대를 메다":"someone takes the lead/blame","손(을) 쓰다":"nothing can be done","여한이 없다":"I have no regrets now","보자 보자 하니까":"I've had enough of this","개성":"to have a strong individuality","경북":"the Gyeongbuk region","경상남도":"from South Gyeongsang","남성":"male respondents","대구":"to live in Daegu","만세":"to cry 'hurrah'","만세 삼창":"to give three cheers","삼세판":"to settle it best-of-three","시민":"civic awareness","여론":"to survey public opinion","연령층":"various age groups","음주":"drunk driving","인구":"to have a large population","전라남도":"a trip to South Jeolla","전라북도":"from North Jeolla","-에 걸치다":"to span the whole country","대표하다":"to represent Korea","응답하다":"to respond to a survey","차지하다":"to take first place","뚜렷하다":"a clear difference","참으로":"truly surprising","틀에 박히다":"stereotyped thinking","경조사":"to attend to family events","경조사비":"to give occasion money","노부부":"an old couple lives (together)","대접":"to be treated / served","미움":"to be disliked","부도":"to go bankrupt","상갓집":"to go to a funeral home","상대적":"relatively","시어머니":"to live with one's mother-in-law","식":"in one way or another","실적":"sales performance","애정":"to pour out affection","약점":"to seize on a weakness","연봉":"one's salary rises","일방적":"one-sided love","정 (情)":"to be warm-hearted","정서":"to be emotionally stable","친근감":"to feel a closeness","판매":"top salesperson","고마워하다":"to be truly grateful","더불다":"along with this","들다":"to grow attached","반하다":"love at first sight","빠지다":"to fall in love","살펴보다":"to look closely","설명되다":"to be explained as","쌓다":"to build a bond","유지되다":"a relationship is maintained","이루어지다":"to be composed of","정의되다":"to be defined as","챙기다":"to look after family","밉다":"affection born of dislike","질기다":"a tenacious tie","단순히":"merely ~","서서히":"to change gradually"},"__EN__":{},"__CHARS__":{},"기왕":{"n":"1과 · 비디오"},"적금":{"n":"1과 · 비디오"},"빡빡하다":{"n":"1과 · 비디오"},"주간지":{"n":"1과 · 비디오"},"곧잘":{"n":"1과 · 비디오"},"과음하다":{"n":"1과 · 비디오"},"접대":{"n":"1과 · 비디오"},"괜히":{"n":"1과 · 비디오"},"타령":{"n":"1과 · 비디오"},"손주":{"n":"1과 · 비디오"},"간만":{"n":"1과 · 비디오"},"표":{"n":"1과 · 비디오"},"일자리":{"n":"1과 · 비디오"},"옜다":{"n":"1과 · 비디오"},"보태다":{"n":"1과 · 비디오"},"내밀다":{"n":"3과 · 읽기·말하기 (2–3과)"},"장사":{"n":"1과 · 비디오"},"깨작깨작하다":{"n":"1과 · 비디오"},"눈치가 보이다":{"n":"1과 · 비디오"},"가뜩이나 (-은/는데)":{"n":"1과 · 비디오"},"입을 틔우다":{"n":"1과 · 비디오"},"밥을 (한 술) 뜨다":{"n":"1과 · 비디오"},"업어 키우다":{"n":"1과 · 비디오"},"가요계":{"n":"1과 · 읽기·말하기"},"근본적":{"n":"1과 · 읽기·말하기"},"논란":{"n":"1과 · 읽기·말하기"},"동시":{"n":"1과 · 읽기·말하기"},"립싱크":{"n":"1과 · 읽기·말하기"},"말솜씨":{"n":"1과 · 읽기·말하기"},"오락":{"n":"1과 · 읽기·말하기"},"증거":{"n":"1과 · 읽기·말하기"},"가꾸다":{"n":"1과 · 읽기·말하기"},"끊이다":{"n":"1과 · 읽기·말하기"},"맞추다":{"n":"1과 · 읽기·말하기"},"선호하다":{"n":"1과 · 읽기·말하기"},"열창하다":{"n":"1과 · 읽기·말하기"},"자랑하다":{"n":"1과 · 읽기·말하기"},"출연하다":{"n":"1과 · 읽기·말하기"},"키우다":{"n":"1과 · 읽기·말하기"},"홍보하다":{"n":"1과 · 읽기·말하기"},"격렬하다":{"n":"1과 · 읽기·말하기"},"뛰어나다":{"n":"1과 · 읽기·말하기"},"열악하다":{"n":"1과 · 읽기·말하기"},"인용의 출처 밝히기":{"n":"1과 · 읽기·말하기"},"연결 기능을 하는 인용 표현의 준말":{"n":"1과 · 읽기·말하기"},"개봉":{"n":"1과 · 읽기·말하기"},"관람":{"n":"1과 · 읽기·말하기"},"눈물바다":{"n":"1과 · 읽기·말하기"},"달리기":{"n":"1과 · 읽기·말하기"},"대사":{"n":"1과 · 읽기·말하기"},"등급":{"n":"1과 · 읽기·말하기"},"만족":{"n":"1과 · 읽기·말하기"},"말다툼":{"n":"1과 · 읽기·말하기"},"몸매":{"n":"1과 · 읽기·말하기"},"방귀":{"n":"1과 · 읽기·말하기"},"불 (弗)":{"n":"1과 · 읽기·말하기"},"상영":{"n":"1과 · 읽기·말하기"},"수준":{"n":"1과 · 읽기·말하기"},"자폐증":{"n":"1과 · 읽기·말하기"},"동고동락하다":{"n":"2과 · 비디오"},"복지관":{"n":"2과 · 비디오"},"코치":{"n":"2과 · 비디오"},"노친네":{"n":"2과 · 비디오"},"실버 스포츠":{"n":"2과 · 비디오"},"뜨다":{"n":"2과 · 비디오"},"유망주":{"n":"2과 · 비디오"},"어마무시하다":{"n":"2과 · 비디오"},"엎드리다":{"n":"2과 · 비디오"},"기본기":{"n":"2과 · 비디오"},"영업":{"n":"4과 · 정 (情) · 영업"},"누님":{"n":"2과 · 비디오"},"허전하다":{"n":"4과 · 정 (情) · 영업"},"알바(를) 뛰다":{"n":"2과 · 비디오"},"목이 좋다":{"n":"2과 · 비디오"},"이래 봬도":{"n":"2과 · 비디오"},"뚝 떨어지다":{"n":"2과 · 비디오"},"허파에 바람이 덜 빠지다":{"n":"2과 · 비디오"},"기가 막히게":{"n":"2과 · 비디오"},"장르":{"n":"2과 · 읽기·말하기 (1–2과)"},"재능":{"n":"2과 · 읽기·말하기 (1–2과)"},"조연":{"n":"2과 · 읽기·말하기 (1–2과)"},"주연":{"n":"2과 · 읽기·말하기 (1–2과)"},"지능":{"n":"2과 · 읽기·말하기 (1–2과)"},"집착":{"n":"2과 · 읽기·말하기 (1–2과)"},"출연":{"n":"2과 · 읽기·말하기 (1–2과)"},"후반부":{"n":"2과 · 읽기·말하기 (1–2과)"},"괴로워하다":{"n":"2과 · 읽기·말하기 (1–2과)"},"착각하다":{"n":"2과 · 읽기·말하기 (1–2과)"},"훌쩍거리다":{"n":"2과 · 읽기·말하기 (1–2과)"},"귀찮다":{"n":"2과 · 읽기·말하기 (1–2과)"},"불성실하다":{"n":"2과 · 읽기·말하기 (1–2과)"},"뻔하다":{"n":"2과 · 읽기·말하기 (1–2과)"},"순수하다":{"n":"2과 · 읽기·말하기 (1–2과)"},"어색하다":{"n":"2과 · 읽기·말하기 (1–2과)"},"허술하다":{"n":"2과 · 읽기·말하기 (1–2과)"},"강추":{"n":"2과 · 읽기·말하기 (1–2과)"},"가슴이 찡하다":{"n":"2과 · 읽기·말하기 (1–2과)"},"두 마리 토끼를 다 잡다":{"n":"2과 · 읽기·말하기 (1–2과)"},"말이 필요 없다":{"n":"2과 · 읽기·말하기 (1–2과)"},"소문난 잔치에 먹을 것 없다":{"n":"2과 · 읽기·말하기 (1–2과)"},"냇가":{"n":"2과 · 읽기·말하기 (1–2과)"},"도깨비":{"n":"2과 · 읽기·말하기 (1–2과)"},"마음씨":{"n":"2과 · 읽기·말하기 (1–2과)"},"박":{"n":"2과 · 읽기·말하기 (1–2과)"},"엉망":{"n":"2과 · 읽기·말하기 (1–2과)"},"욕심꾸러기":{"n":"2과 · 읽기·말하기 (1–2과)"},"유언":{"n":"2과 · 읽기·말하기 (1–2과)"},"자리":{"n":"2과 · 읽기·말하기 (1–2과)"},"제비":{"n":"2과 · 읽기·말하기 (1–2과)"},"청개구리":{"n":"2과 · 읽기·말하기 (1–2과)"},"푼":{"n":"2과 · 읽기·말하기 (1–2과)"},"가져다주다":{"n":"2과 · 읽기·말하기 (1–2과)"},"떠내려가다":{"n":"2과 · 읽기·말하기 (1–2과)"},"물다":{"n":"2과 · 읽기·말하기 (1–2과)"},"물려받다":{"n":"2과 · 읽기·말하기 (1–2과)"},"부러뜨리다":{"n":"2과 · 읽기·말하기 (1–2과)"},"쫓겨나다":{"n":"2과 · 읽기·말하기 (1–2과)"},"쫓아내다":{"n":"2과 · 읽기·말하기 (1–2과)"},"혼내다":{"n":"2과 · 읽기·말하기 (1–2과)"},"놀랍다":{"n":"2과 · 읽기·말하기 (1–2과)"},"심술궂다":{"n":"2과 · 읽기·말하기 (1–2과)"},"개굴개굴":{"n":"2과 · 읽기·말하기 (1–2과)"},"정성껏":{"n":"2과 · 읽기·말하기 (1–2과)"},"꼬르륵":{"n":"2과 · 읽기·말하기 (1–2과)"},"꾸벅꾸벅":{"n":"2과 · 읽기·말하기 (1–2과)"},"뚝":{"n":"3과 · 읽기·말하기"},"벌떡":{"n":"2과 · 읽기·말하기 (1–2과)"},"벌컥벌컥":{"n":"2과 · 읽기·말하기 (1–2과)"},"빙빙":{"n":"3과 · 읽기·말하기 (2–3과)"},"덕 (~덕에)":{"n":"3과 · 비디오"},"누리다":{"n":"3과 · 비디오"},"어쨌든":{"n":"3과 · 비디오"},"복직하다":{"n":"3과 · 비디오"},"떠넘기다":{"n":"3과 · 비디오"},"효도":{"n":"3과 · 비디오"},"예민하다":{"n":"3과 · 비디오"},"룰":{"n":"3과 · 비디오"},"제한":{"n":"3과 · 비디오"},"막":{"n":"3과 · 비디오"},"화상":{"n":"3과 · 비디오"},"순간적":{"n":"4과 · 읽기·말하기"},"기절하다":{"n":"3과 · 비디오"},"응급실":{"n":"3과 · 비디오"},"말대꾸":{"n":"3과 · 비디오"},"(○○ 씨) 말로는 ~대요":{"n":"3과 · 비디오"},"뻘뻘":{"n":"3과 · 읽기·말하기 (2–3과)"},"쑥":{"n":"3과 · 읽기·말하기 (2–3과)"},"웅성웅성":{"n":"3과 · 읽기·말하기 (2–3과)"},"쾅":{"n":"3과 · 읽기·말하기 (2–3과)"},"쿨쿨":{"n":"3과 · 읽기·말하기 (2–3과)"},"훌쩍훌쩍":{"n":"3과 · 읽기·말하기 (2–3과)"},"고개":{"n":"3과 · 읽기·말하기 (2–3과)"},"머릿수건":{"n":"3과 · 읽기·말하기 (2–3과)"},"문틈":{"n":"3과 · 읽기·말하기 (2–3과)"},"바보":{"n":"3과 · 읽기·말하기 (2–3과)"},"밧줄":{"n":"3과 · 읽기·말하기 (2–3과)"},"오누이":{"n":"3과 · 읽기·말하기 (2–3과)"},"쥐":{"n":"3과 · 읽기·말하기 (2–3과)"},"털":{"n":"3과 · 읽기·말하기 (2–3과)"},"하느님":{"n":"3과 · 읽기·말하기 (2–3과)"},"하늘나라":{"n":"3과 · 읽기·말하기 (2–3과)"},"가리다":{"n":"3과 · 읽기·말하기 (2–3과)"},"끊어지다":{"n":"3과 · 읽기·말하기 (2–3과)"},"들여다보다":{"n":"3과 · 읽기·말하기 (2–3과)"},"비치다":{"n":"3과 · 읽기·말하기 (2–3과)"},"소리치다":{"n":"3과 · 읽기·말하기 (2–3과)"},"숨다":{"n":"3과 · 읽기·말하기 (2–3과)"},"쉬다":{"n":"3과 · 읽기·말하기 (2–3과)"},"잡아먹다":{"n":"3과 · 읽기·말하기 (2–3과)"},"질리다":{"n":"3과 · 읽기·말하기 (2–3과)"},"굵다":{"n":"3과 · 읽기·말하기 (2–3과)"},"깊다":{"n":"3과 · 읽기·말하기 (2–3과)"},"뚝뚝":{"n":"3과 · 읽기·말하기 (2–3과)"},"살금살금":{"n":"3과 · 읽기·말하기 (2–3과)"},"어흥":{"n":"3과 · 읽기·말하기 (2–3과)"},"잔뜩":{"n":"3과 · 읽기·말하기 (2–3과)"},"쿵":{"n":"3과 · 읽기·말하기 (2–3과)"},"쿵쿵":{"n":"3과 · 읽기·말하기 (2–3과)"},"독 안에 든 쥐":{"n":"3과 · 읽기·말하기 (2–3과)"},"빙빙 돌다":{"n":"3과 · 읽기·말하기 (2–3과)"},"건전지":{"n":"3과 · 읽기·말하기 (2–3과)"},"구멍":{"n":"3과 · 읽기·말하기 (2–3과)"},"눈꺼풀":{"n":"3과 · 읽기·말하기 (2–3과)"},"독소":{"n":"3과 · 읽기·말하기 (2–3과)"},"린스":{"n":"3과 · 읽기·말하기 (2–3과)"},"망치":{"n":"3과 · 읽기·말하기 (2–3과)"},"모기":{"n":"3과 · 읽기·말하기 (2–3과)"},"무좀":{"n":"3과 · 읽기·말하기 (2–3과)"},"물파스":{"n":"3과 · 읽기·말하기 (2–3과)"},"석유":{"n":"3과 · 읽기·말하기 (2–3과)"},"습기":{"n":"3과 · 읽기·말하기 (2–3과)"},"여드름":{"n":"3과 · 읽기·말하기"},"열":{"n":"3과 · 읽기·말하기 (2–3과)"},"잉크":{"n":"3과 · 읽기·말하기 (2–3과)"},"진공청소기":{"n":"3과 · 읽기·말하기"},"탈모":{"n":"3과 · 읽기·말하기"},"호두":{"n":"3과 · 읽기·말하기"},"구기다":{"n":"3과 · 읽기·말하기"},"달래다":{"n":"3과 · 읽기·말하기"},"묻다":{"n":"3과 · 읽기·말하기"},"물리다":{"n":"3과 · 읽기·말하기"},"변형되다":{"n":"3과 · 읽기·말하기"},"사라지다":{"n":"3과 · 읽기·말하기"},"없애다":{"n":"3과 · 읽기·말하기"},"제거하다":{"n":"3과 · 읽기·말하기"},"지우다":{"n":"3과 · 읽기·말하기"},"헹구다":{"n":"7과 · 비디오"},"가렵다":{"n":"3과 · 읽기·말하기"},"덜하다":{"n":"3과 · 읽기·말하기"},"서너":{"n":"3과 · 읽기·말하기"},"남극":{"n":"3과 · 읽기·말하기"},"북극":{"n":"3과 · 읽기·말하기"},"사막":{"n":"3과 · 읽기·말하기"},"적도":{"n":"3과 · 읽기·말하기"},"태평양":{"n":"3과 · 읽기·말하기"},"가뭄":{"n":"3과 · 읽기·말하기"},"자외선":{"n":"3과 · 읽기·말하기"},"해일":{"n":"3과 · 읽기·말하기"},"홍수":{"n":"3과 · 읽기·말하기"},"황사":{"n":"3과 · 읽기·말하기"},"거미":{"n":"3과 · 읽기·말하기"},"매미":{"n":"3과 · 읽기·말하기"},"바퀴벌레":{"n":"3과 · 읽기·말하기"},"잠자리":{"n":"3과 · 읽기·말하기"},"파리":{"n":"3과 · 읽기·말하기"},"공룡":{"n":"3과 · 읽기·말하기"},"기린":{"n":"3과 · 읽기·말하기"},"코끼리":{"n":"3과 · 읽기·말하기"},"펭귄":{"n":"3과 · 읽기·말하기"},"수컷 / 암컷":{"n":"3과 · 읽기·말하기"},"미각":{"n":"3과 · 읽기·말하기"},"시각":{"n":"3과 · 읽기·말하기"},"청각":{"n":"3과 · 읽기·말하기"},"촉각":{"n":"3과 · 읽기·말하기"},"후각":{"n":"3과 · 읽기·말하기"},"잠꼬대":{"n":"3과 · 읽기·말하기"},"재채기":{"n":"3과 · 읽기·말하기"},"트림":{"n":"3과 · 읽기·말하기"},"하품":{"n":"3과 · 읽기·말하기"},"기억력":{"n":"3과 · 읽기·말하기"},"뇌":{"n":"3과 · 읽기·말하기"},"우뇌":{"n":"3과 · 읽기·말하기"},"좌뇌":{"n":"3과 · 읽기·말하기"},"모국어":{"n":"3과 · 읽기·말하기"},"발달":{"n":"3과 · 읽기·말하기"},"변화":{"n":"3과 · 읽기·말하기"},"스트레칭":{"n":"3과 · 읽기·말하기"},"양손":{"n":"3과 · 읽기·말하기"},"역할":{"n":"3과 · 읽기·말하기"},"영향":{"n":"3과 · 읽기·말하기"},"오감":{"n":"3과 · 읽기·말하기"},"자극":{"n":"3과 · 읽기·말하기"},"증진":{"n":"3과 · 읽기·말하기"},"창의적":{"n":"3과 · 읽기·말하기"},"호기심":{"n":"3과 · 읽기·말하기"},"뜻하다":{"n":"3과 · 읽기·말하기"},"박히다":{"n":"3과 · 읽기·말하기"},"벗어나다":{"n":"3과 · 읽기·말하기"},"자극하다":{"n":"3과 · 읽기·말하기"},"좌우하다":{"n":"3과 · 읽기·말하기"},"어리석다":{"n":"3과 · 읽기·말하기"},"지혜롭다":{"n":"3과 · 읽기·말하기"},"침착하다":{"n":"3과 · 읽기·말하기"},"결코":{"n":"3과 · 읽기·말하기"},"조회 수":{"n":"4과 · 비디오"},"반응":{"n":"7과 · 읽기·말하기"},"입상":{"n":"4과 · 비디오"},"내팽개치다":{"n":"4과 · 비디오"},"노름하다":{"n":"4과 · 비디오"},"어르신":{"n":"4과 · 비디오"},"조신하다":{"n":"4과 · 비디오"},"여사(님)":{"n":"4과 · 비디오"},"성함":{"n":"4과 · 비디오"},"부문":{"n":"4과 · 비디오"},"출전하다":{"n":"4과 · 비디오"},"며늘아기":{"n":"4과 · 비디오"},"소원성취하다":{"n":"4과 · 비디오"},"지경":{"n":"4과 · 비디오"},"고혈압":{"n":"4과 · 비디오"},"건사하다":{"n":"4과 · 비디오"},"내기":{"n":"4과 · 비디오"},"비기다":{"n":"4과 · 비디오"},"-는 게 어디 있어요?":{"n":"4과 · 비디오"},"집안이 시끄럽다":{"n":"4과 · 비디오"},"(의) 여신":{"n":"4과 · 비디오"},"총대를 메다":{"n":"4과 · 비디오"},"손(을) 쓰다":{"n":"4과 · 비디오"},"걱정이 태산이다":{"n":"4과 · 비디오"},"여한이 없다":{"n":"4과 · 비디오"},"보자 보자 하니까":{"n":"4과 · 비디오"},"개성":{"n":"4과 · 읽기·말하기"},"경북":{"n":"4과 · 읽기·말하기"},"경상남도":{"n":"4과 · 읽기·말하기"},"남성":{"n":"4과 · 읽기·말하기"},"대구":{"n":"4과 · 읽기·말하기"},"만세":{"n":"4과 · 읽기·말하기"},"만세 삼창":{"n":"4과 · 읽기·말하기"},"삼세판":{"n":"4과 · 읽기·말하기"},"시민":{"n":"4과 · 읽기·말하기"},"여론":{"n":"4과 · 읽기·말하기"},"연령층":{"n":"4과 · 읽기·말하기"},"음주":{"n":"4과 · 읽기·말하기"},"인구":{"n":"4과 · 읽기·말하기"},"전라남도":{"n":"4과 · 읽기·말하기"},"전라북도":{"n":"4과 · 읽기·말하기"},"-에 걸치다":{"n":"4과 · 읽기·말하기"},"대표하다":{"n":"4과 · 읽기·말하기"},"응답하다":{"n":"4과 · 읽기·말하기"},"차지하다":{"n":"4과 · 읽기·말하기"},"뚜렷하다":{"n":"4과 · 읽기·말하기"},"참으로":{"n":"4과 · 읽기·말하기"},"어쩔 수 없다":{"n":"4과 · 읽기·말하기"},"틀에 박히다":{"n":"4과 · 읽기·말하기"},"경조사":{"n":"4과 · 읽기·말하기"},"경조사비":{"n":"4과 · 읽기·말하기"},"노부부":{"n":"4과 · 읽기·말하기"},"대접":{"n":"4과 · 읽기·말하기"},"미움":{"n":"4과 · 읽기·말하기"},"부도":{"n":"4과 · 읽기·말하기"},"상갓집":{"n":"4과 · 읽기·말하기"},"상대적":{"n":"4과 · 읽기·말하기"},"시어머니":{"n":"4과 · 읽기·말하기"},"식":{"n":"4과 · 읽기·말하기"},"설문 조사 대상과 주제 밝히기":{"n":"4과 · 읽기·말하기"},"가장 많이 나온 의견 말하기":{"n":"4과 · 읽기·말하기"},"두 번째로 많이 나온 의견부터 순서대로 말하기":{"n":"4과 · 읽기·말하기"},"기타 의견 말하기":{"n":"4과 · 읽기·말하기"},"설문 결과를 통해 알게 된 내용 설명하기":{"n":"4과 · 읽기·말하기"},"실적":{"n":"4과 · 정 (情) · 영업"},"애정":{"n":"4과 · 정 (情) · 영업"},"약점":{"n":"4과 · 정 (情) · 영업"},"연봉":{"n":"4과 · 정 (情) · 영업"},"일방적":{"n":"4과 · 정 (情) · 영업"},"정 (情)":{"n":"4과 · 정 (情) · 영업"},"정서":{"n":"4과 · 정 (情) · 영업"},"친근감":{"n":"4과 · 정 (情) · 영업"},"판매":{"n":"4과 · 정 (情) · 영업"},"고마워하다":{"n":"4과 · 정 (情) · 영업"},"더불다":{"n":"4과 · 정 (情) · 영업"},"들다":{"n":"4과 · 정 (情) · 영업"},"반하다":{"n":"6과 · 비디오"},"빠지다":{"n":"4과 · 정 (情) · 영업"},"살펴보다":{"n":"4과 · 정 (情) · 영업"},"설명되다":{"n":"4과 · 정 (情) · 영업"},"쌓다":{"n":"4과 · 정 (情) · 영업"},"유지되다":{"n":"4과 · 정 (情) · 영업"},"이루어지다":{"n":"4과 · 정 (情) · 영업"},"정의되다":{"n":"4과 · 정 (情) · 영업"},"챙기다":{"n":"4과 · 정 (情) · 영업"},"밉다":{"n":"4과 · 정 (情) · 영업"},"질기다":{"n":"4과 · 정 (情) · 영업"},"단순히":{"n":"4과 · 정 (情) · 영업"},"서서히":{"n":"4과 · 정 (情) · 영업"},"과언이 아니다":{"n":"4과 · 정 (情) · 영업"},"첫눈에 반하다":{"n":"4과 · 정 (情) · 영업"},"정을 쌓다":{"n":"4과 · 정 (情) · 영업"},"정이 들다":{"n":"4과 · 정 (情) · 영업"},"허기지다":{"n":"5과 · 비디오"},"현지":{"n":"5과 · 비디오"},"극기 훈련":{"n":"5과 · 비디오"},"한겨울":{"n":"5과 · 비디오"},"떼":{"n":"5과 · 비디오"},"휭휭":{"n":"5과 · 비디오"},"쫓다":{"n":"5과 · 비디오"},"강제":{"n":"5과 · 비디오"},"이주":{"n":"5과 · 비디오"},"초췌하다":{"n":"5과 · 비디오"},"탁":{"n":"5과 · 비디오"},"관광청":{"n":"5과 · 비디오"},"장기 여행":{"n":"5과 · 비디오"},"훑다":{"n":"5과 · 비디오"},"넓히다":{"n":"5과 · 비디오"},"예리하다":{"n":"5과 · 비디오"},"의외로":{"n":"5과 · 비디오"},"공간감":{"n":"5과 · 비디오"},"닳다":{"n":"5과 · 비디오"},"재현":{"n":"5과 · 비디오"},"쬐다":{"n":"5과 · 비디오"},"조그맣다":{"n":"5과 · 비디오"},"부엉이":{"n":"5과 · 비디오"},"파드닥거리다":{"n":"5과 · 비디오"},"강렬하다":{"n":"5과 · 비디오"},"말이 -(이)지":{"n":"5과 · 비디오"},"-을/를 통틀어(서)":{"n":"5과 · 비디오"},"객관적":{"n":"5과 · 읽기·말하기"},"검사":{"n":"5과 · 읽기·말하기"},"기준":{"n":"5과 · 읽기·말하기"},"별자리":{"n":"5과 · 읽기·말하기"},"분석적":{"n":"5과 · 읽기·말하기"},"사물":{"n":"5과 · 읽기·말하기"},"에너지":{"n":"5과 · 읽기·말하기"},"외부":{"n":"5과 · 읽기·말하기"},"이론":{"n":"5과 · 읽기·말하기"},"현실적":{"n":"5과 · 읽기·말하기"},"혈액형":{"n":"5과 · 읽기·말하기"},"효율적":{"n":"5과 · 읽기·말하기"},"맺다":{"n":"5과 · 읽기·말하기"},"파악하다":{"n":"5과 · 읽기·말하기"},"흔들리다":{"n":"5과 · 읽기·말하기"},"신중하다":{"n":"5과 · 읽기·말하기"},"겸손하다":{"n":"5과 · 읽기·말하기"},"까다롭다":{"n":"5과 · 읽기·말하기"},"꼼꼼하다":{"n":"5과 · 읽기·말하기"},"단순하다":{"n":"5과 · 읽기·말하기"},"털털하다":{"n":"5과 · 읽기·말하기"},"보수적이다":{"n":"5과 · 읽기·말하기"},"변덕스럽다":{"n":"5과 · 읽기·말하기"},"시원시원하다":{"n":"5과 · 읽기·말하기"},"싫증을 잘 내다":{"n":"5과 · 읽기·말하기"},"예술 감각이 있다":{"n":"5과 · 읽기·말하기"},"융통성이 있다":{"n":"5과 · 읽기·말하기"},"이기적이다":{"n":"5과 · 읽기·말하기"},"이성적이다":{"n":"5과 · 읽기·말하기"},"직선적이다":{"n":"5과 · 읽기·말하기"},"차분하다":{"n":"5과 · 읽기·말하기"},"나름":{"n":"5과 · 읽기·말하기"},"방해":{"n":"5과 · 읽기·말하기"},"서류함":{"n":"5과 · 읽기·말하기"},"소용":{"n":"5과 · 읽기·말하기"},"아이디어":{"n":"5과 · 읽기·말하기"},"이상적":{"n":"5과 · 읽기·말하기"},"조직적":{"n":"5과 · 읽기·말하기"},"책장":{"n":"5과 · 읽기·말하기"},"결재하다":{"n":"5과 · 읽기·말하기"},"대처하다":{"n":"5과 · 읽기·말하기"},"비다":{"n":"5과 · 읽기·말하기"},"여기다":{"n":"5과 · 읽기·말하기"},"재충전하다":{"n":"5과 · 읽기·말하기"},"처리하다":{"n":"5과 · 읽기·말하기"},"틀어박히다":{"n":"5과 · 읽기·말하기"},"해내다":{"n":"5과 · 읽기·말하기"},"허비하다":{"n":"5과 · 읽기·말하기"},"흩어 놓다":{"n":"5과 · 읽기·말하기"},"깔끔하다":{"n":"5과 · 읽기·말하기"},"어지럽다":{"n":"5과 · 읽기·말하기"},"도무지":{"n":"5과 · 읽기·말하기"},"모처럼":{"n":"5과 · 읽기·말하기"},"절레절레":{"n":"5과 · 읽기·말하기"},"철저히":{"n":"5과 · 읽기·말하기"},"녹초가 되다":{"n":"5과 · 읽기·말하기"},"소귀에 경 읽기":{"n":"5과 · 읽기·말하기"},"직책":{"n":"6과 · 비디오"},"정시 퇴근":{"n":"6과 · 비디오"},"인형 탈":{"n":"6과 · 비디오"},"관리직":{"n":"6과 · 비디오"},"흔히":{"n":"6과 · 비디오"},"워라밸":{"n":"6과 · 비디오"},"와닿다":{"n":"6과 · 비디오"},"본업":{"n":"6과 · 비디오"},"충실하다":{"n":"6과 · 비디오"},"벅차다":{"n":"6과 · 비디오"},"주인 의식":{"n":"6과 · 비디오"},"고통":{"n":"6과 · 비디오"},"사업상":{"n":"6과 · 비디오"},"끈끈하다":{"n":"6과 · 비디오"},"지나치다":{"n":"6과 · 비디오"},"우정":{"n":"6과 · 비디오"},"강요받다":{"n":"6과 · 비디오"},"괜한 소리를 하다":{"n":"6과 · 비디오"},"죽은 듯이 있다":{"n":"6과 · 비디오"},"말을 아끼다":{"n":"6과 · 비디오"},"혀를 내두르다":{"n":"6과 · 비디오"},"밸런스를 맞추다":{"n":"6과 · 비디오"},"기에 눌리다":{"n":"6과 · 비디오"},"가사":{"n":"6과 · 읽기·말하기"},"고령":{"n":"6과 · 읽기·말하기"},"공교육":{"n":"6과 · 읽기·말하기"},"경기":{"n":"6과 · 읽기·말하기"},"기혼":{"n":"6과 · 읽기·말하기"},"대책":{"n":"6과 · 읽기·말하기"},"보육":{"n":"6과 · 읽기·말하기"},"사교육":{"n":"6과 · 읽기·말하기"},"사상":{"n":"6과 · 읽기·말하기"},"성인":{"n":"6과 · 읽기·말하기"},"애":{"n":"6과 · 읽기·말하기"},"양립":{"n":"6과 · 읽기·말하기"},"육아":{"n":"6과 · 읽기·말하기"},"정부":{"n":"6과 · 읽기·말하기"},"조기 유학":{"n":"6과 · 읽기·말하기"},"지난해":{"n":"6과 · 읽기·말하기"},"출산":{"n":"6과 · 읽기·말하기"},"통계":{"n":"6과 · 읽기·말하기"},"평균":{"n":"6과 · 읽기·말하기"},"허용":{"n":"6과 · 읽기·말하기"},"그치다":{"n":"6과 · 읽기·말하기"},"꼽다":{"n":"6과 · 읽기·말하기"},"기록하다":{"n":"6과 · 읽기·말하기"},"답하다":{"n":"6과 · 읽기·말하기"},"실시하다":{"n":"6과 · 읽기·말하기"},"증가하다":{"n":"6과 · 읽기·말하기"},"진입하다":{"n":"6과 · 읽기·말하기"},"시급하다":{"n":"6과 · 읽기·말하기"},"급격히":{"n":"6과 · 읽기·말하기"},"초":{"n":"6과 · 읽기·말하기"},"오랜":{"n":"6과 · 읽기·말하기"},"초·중·고교생":{"n":"6과 · 읽기·말하기"},"-(으)므로":{"n":"6과 · 읽기·말하기"},"-(으)ㄴ/는 데다가":{"n":"6과 · 읽기·말하기"},"-다든지 -다든지 하다":{"n":"6과 · 읽기·말하기"},"만약 -(으)ㄹ 경우":{"n":"6과 · 읽기·말하기"},"전적으로 동의하다":{"n":"6과 · 읽기·말하기"},"과외":{"n":"6과 · 읽기·말하기"},"거부":{"n":"6과 · 읽기·말하기"},"교육열":{"n":"6과 · 읽기·말하기"},"구조":{"n":"6과 · 읽기·말하기"},"국가적":{"n":"6과 · 읽기·말하기"},"국내":{"n":"6과 · 읽기·말하기"},"기러기아빠":{"n":"6과 · 읽기·말하기"},"낭비":{"n":"6과 · 읽기·말하기"},"맹모삼천지교":{"n":"6과 · 읽기·말하기"},"문제점":{"n":"6과 · 읽기·말하기"},"비용":{"n":"6과 · 읽기·말하기"},"어학연수":{"n":"6과 · 읽기·말하기"},"언론":{"n":"6과 · 읽기·말하기"},"열의":{"n":"6과 · 읽기·말하기"},"위주":{"n":"6과 · 읽기·말하기"},"이익":{"n":"6과 · 읽기·말하기"},"자식":{"n":"6과 · 읽기·말하기"},"적응력":{"n":"6과 · 읽기·말하기"},"제도":{"n":"6과 · 읽기·말하기"},"정상화":{"n":"6과 · 읽기·말하기"},"차원":{"n":"6과 · 읽기·말하기"},"해결책":{"n":"6과 · 읽기·말하기"},"마련하다":{"n":"6과 · 읽기·말하기"},"받아들이다":{"n":"6과 · 읽기·말하기"},"보도되다":{"n":"6과 · 읽기·말하기"},"습득하다":{"n":"6과 · 읽기·말하기"},"바람직하다":{"n":"6과 · 읽기·말하기"},"유리하다":{"n":"6과 · 읽기·말하기"},"팽팽하다":{"n":"6과 · 읽기·말하기"},"대단히":{"n":"6과 · 읽기·말하기"},"종종":{"n":"6과 · 읽기·말하기"},"별 차이가 없다":{"n":"6과 · 읽기·말하기"},"영향을 미치다":{"n":"6과 · 읽기·말하기"},"일리가 있다":{"n":"6과 · 읽기·말하기"},"입장을 밝히다":{"n":"6과 · 읽기·말하기"},"정체성을 갖추다":{"n":"6과 · 읽기·말하기"},"위생":{"n":"7과 · 비디오"},"생필품":{"n":"7과 · 비디오"},"채워지다":{"n":"7과 · 비디오"},"순식간":{"n":"7과 · 비디오"},"여러모로":{"n":"7과 · 비디오"},"심지어":{"n":"7과 · 비디오"},"꾹":{"n":"7과 · 비디오"},"훼손되다":{"n":"7과 · 비디오"},"장보기":{"n":"7과 · 비디오"},"망":{"n":"7과 · 비디오"},"재택근무":{"n":"7과 · 비디오"},"반조리":{"n":"7과 · 비디오"},"꺼림칙하다":{"n":"7과 · 비디오"},"교체되다":{"n":"7과 · 비디오"},"용기":{"n":"7과 · 비디오"},"합성":{"n":"7과 · 비디오"},"유용하다":{"n":"7과 · 비디오"},"푸짐하다":{"n":"7과 · 비디오"},"집밥":{"n":"7과 · 비디오"},"조물주":{"n":"7과 · 비디오"},"치우다":{"n":"7과 · 비디오"},"뜯다":{"n":"7과 · 비디오"},"전락하다":{"n":"7과 · 비디오"},"-당":{"n":"7과 · 비디오"},"도리":{"n":"7과 · 비디오"},"보기 좋은 떡이 먹기에 좋다":{"n":"7과 · 비디오"},"이것저것 없는 게 없다":{"n":"7과 · 비디오"},"웬만해서는 -는 일 없다":{"n":"7과 · 비디오"},"-(으)랴 -(으)랴":{"n":"7과 · 비디오"},"-은/는 늘 뒷전이다":{"n":"7과 · 비디오"},"숨통이 트이다":{"n":"7과 · 비디오"},"믿는 구석이 있다":{"n":"7과 · 비디오"},"망신":{"n":"7과 · 읽기·말하기"},"부":{"n":"7과 · 읽기·말하기"},"안색":{"n":"7과 · 읽기·말하기"},"지칭":{"n":"7과 · 읽기·말하기"},"직함":{"n":"7과 · 읽기·말하기"},"호칭어":{"n":"7과 · 읽기·말하기"},"홍보":{"n":"7과 · 읽기·말하기"},"저지르다":{"n":"7과 · 읽기·말하기"},"못지않다":{"n":"7과 · 읽기·말하기"},"무례하다":{"n":"7과 · 읽기·말하기"},"어설프다":{"n":"7과 · 읽기·말하기"},"유창하다":{"n":"7과 · 읽기·말하기"},"사모님":{"n":"7과 · 읽기·말하기"},"그쪽":{"n":"7과 · 읽기·말하기"},"저기요":{"n":"7과 · 읽기·말하기"},"배워도 배워도 끝이 없다":{"n":"7과 · 읽기·말하기"},"뭐니 뭐니 해도":{"n":"7과 · 읽기·말하기"},"강의록":{"n":"7과 · 읽기·말하기"},"남미":{"n":"7과 · 읽기·말하기"},"동그라미":{"n":"7과 · 읽기·말하기"},"동성연애":{"n":"7과 · 읽기·말하기"},"몸짓언어":{"n":"7과 · 읽기·말하기"},"문화권":{"n":"7과 · 읽기·말하기"},"배경":{"n":"7과 · 읽기·말하기"},"보편적":{"n":"7과 · 읽기·말하기"},"비웃음":{"n":"7과 · 읽기·말하기"},"자세":{"n":"7과 · 읽기·말하기"},"좌우":{"n":"7과 · 읽기·말하기"},"지중해":{"n":"7과 · 읽기·말하기"},"턱":{"n":"7과 · 읽기·말하기"},"팔짱":{"n":"7과 · 읽기·말하기"},"포옹":{"n":"7과 · 읽기·말하기"},"결합되다":{"n":"7과 · 읽기·말하기"},"고려하다":{"n":"7과 · 읽기·말하기"},"굽히다":{"n":"7과 · 읽기·말하기"},"끄덕이다":{"n":"7과 · 읽기·말하기"},"끼다":{"n":"7과 · 읽기·말하기"},"뻗다":{"n":"7과 · 읽기·말하기"},"찡그리다":{"n":"7과 · 읽기·말하기"},"해석되다":{"n":"7과 · 읽기·말하기"},"해석하다":{"n":"7과 · 읽기·말하기"},"가볍다":{"n":"7과 · 읽기·말하기"},"마주":{"n":"7과 · 읽기·말하기"},"아무런":{"n":"7과 · 읽기·말하기"},"잘돼 가다":{"n":"7과 · 읽기·말하기"},"분류":{"n":"8과 · 비디오"},"마개":{"n":"8과 · 비디오"},"압축":{"n":"8과 · 비디오"},"분리배출":{"n":"8과 · 비디오"},"공정":{"n":"8과 · 비디오"},"복합 재질":{"n":"8과 · 비디오"},"선별":{"n":"8과 · 비디오"},"종량제 봉투":{"n":"8과 · 비디오"},"품목":{"n":"8과 · 비디오"},"포장재":{"n":"8과 · 비디오"},"난감하다":{"n":"8과 · 비디오"},"날":{"n":"8과 · 비디오"},"폐기되다":{"n":"8과 · 비디오"},"관심도":{"n":"8과 · 비디오"},"한정하다":{"n":"8과 · 비디오"},"추정":{"n":"8과 · 비디오"},"생활화":{"n":"8과 · 비디오"},"의아하다":{"n":"8과 · 비디오"},"치명타":{"n":"8과 · 비디오"},"복구하다":{"n":"8과 · 비디오"},"접근하다":{"n":"8과 · 비디오"},"맞아떨어지다":{"n":"8과 · 비디오"},"-(으)로 손에 꼽히다":{"n":"8과 · 비디오"},"문제를 일으키다":{"n":"8과 · 비디오"},"-(으)면 끝이 아니다":{"n":"8과 · 비디오"},"믿는 도끼에 발등 찍힌다":{"n":"8과 · 비디오"},"갓":{"n":"8과 · 읽기·말하기"},"구경꾼":{"n":"8과 · 읽기·말하기"},"깍지":{"n":"8과 · 읽기·말하기"},"손등":{"n":"8과 · 읽기·말하기"},"승부":{"n":"8과 · 읽기·말하기"},"씨름꾼":{"n":"8과 · 읽기·말하기"},"악사":{"n":"8과 · 읽기·말하기"},"안간힘":{"n":"8과 · 읽기·말하기"},"율동":{"n":"8과 · 읽기·말하기"},"입술":{"n":"8과 · 읽기·말하기"},"편":{"n":"8과 · 읽기·말하기"},"관찰하다":{"n":"8과 · 읽기·말하기"},"넘어뜨리다":{"n":"8과 · 읽기·말하기"},"넘치다":{"n":"8과 · 읽기·말하기"},"어우러지다":{"n":"8과 · 읽기·말하기"},"장난치다":{"n":"8과 · 읽기·말하기"},"찌푸리다":{"n":"8과 · 읽기·말하기"},"삼각형":{"n":"8과 · 읽기·말하기"},"정사각형":{"n":"8과 · 읽기·말하기"},"직사각형":{"n":"8과 · 읽기·말하기"},"정육면체":{"n":"8과 · 읽기·말하기"},"원형":{"n":"8과 · 읽기·말하기"},"원뿔형":{"n":"8과 · 읽기·말하기"},"원기둥형":{"n":"8과 · 읽기·말하기"},"타원형":{"n":"8과 · 읽기·말하기"},"둥글다":{"n":"8과 · 읽기·말하기"},"유리":{"n":"8과 · 읽기·말하기"},"나무":{"n":"8과 · 읽기·말하기"},"금속":{"n":"8과 · 읽기·말하기"},"금":{"n":"8과 · 읽기·말하기"},"은":{"n":"8과 · 읽기·말하기"},"철":{"n":"8과 · 읽기·말하기"},"흙":{"n":"8과 · 읽기·말하기"},"플라스틱":{"n":"8과 · 읽기·말하기"},"천":{"n":"8과 · 읽기·말하기"},"가죽":{"n":"8과 · 읽기·말하기"},"딱딱하다":{"n":"8과 · 읽기·말하기"},"부드럽다":{"n":"8과 · 읽기·말하기"},"완만하다":{"n":"8과 · 읽기·말하기"},"가파르다":{"n":"8과 · 읽기·말하기"},"평평하다":{"n":"8과 · 읽기·말하기"},"울퉁불퉁하다":{"n":"8과 · 읽기·말하기"},"구불구불하다":{"n":"8과 · 읽기·말하기"},"길쭉하다":{"n":"8과 · 읽기·말하기"},"네모나다":{"n":"8과 · 읽기·말하기"},"푹신하다":{"n":"8과 · 읽기·말하기"},"투명하다":{"n":"8과 · 읽기·말하기"},"잔잔하다":{"n":"8과 · 읽기·말하기"},"얕다":{"n":"8과 · 읽기·말하기"},"수평선":{"n":"8과 · 읽기·말하기"},"오르막길":{"n":"8과 · 읽기·말하기"},"내리막길":{"n":"8과 · 읽기·말하기"},"가명":{"n":"8과 · 읽기·말하기"},"낙서":{"n":"8과 · 읽기·말하기"},"불안감":{"n":"8과 · 읽기·말하기"},"신경쇠약":{"n":"8과 · 읽기·말하기"},"안정감":{"n":"8과 · 읽기·말하기"},"의문":{"n":"8과 · 읽기·말하기"},"일부":{"n":"8과 · 읽기·말하기"},"정신과":{"n":"8과 · 읽기·말하기"},"즐거움":{"n":"8과 · 읽기·말하기"},"지수":{"n":"8과 · 읽기·말하기"},"지적":{"n":"8과 · 읽기·말하기"},"진실":{"n":"8과 · 읽기·말하기"},"회복":{"n":"8과 · 읽기·말하기"},"감상하다":{"n":"8과 · 읽기·말하기"},"다루다":{"n":"8과 · 읽기·말하기"},"덜다":{"n":"8과 · 읽기·말하기"},"드러나다":{"n":"8과 · 읽기·말하기"},"떠올리다":{"n":"8과 · 읽기·말하기"},"앓다":{"n":"8과 · 읽기·말하기"},"재현하다":{"n":"8과 · 읽기·말하기"},"해소되다":{"n":"8과 · 읽기·말하기"},"해소하다":{"n":"8과 · 읽기·말하기"},"두렵다":{"n":"8과 · 읽기·말하기"},"솔깃하다":{"n":"8과 · 읽기·말하기"},"폭넓다":{"n":"8과 · 읽기·말하기"},"가늘다":{"n":"8과 · 읽기·말하기"},"둥그렇다":{"n":"8과 · 읽기·말하기"},"흥겹다":{"n":"8과 · 읽기·말하기"},"차츰":{"n":"8과 · 읽기·말하기"},"헤":{"n":"8과 · 읽기·말하기"}};                 // per-word hanja / usage notes (marathon study panel)
+const EN_SIMPLE = NOTES.__EN__ || {};    // hard English word -> plain English
+const CHAR_EN = NOTES.__CHARS__ || {};   // single hanja character -> English meaning
+const EX_EN = NOTES.__EX__ || {};        // word -> English translation of its example sentence
+// ch1-4 examples are stored as "한국어 문장 = english"; ch5-8 are Korean only (translation in __EX__)
+function exampleParts(card){
+  const raw=(card.ex||"").trim(); if(!raw) return null;
+  const i=raw.indexOf(" = ");
+  if(i>0) return {kr:raw.slice(0,i).trim(), en:raw.slice(i+3).trim()};
+  return {kr:raw, en:EX_EN[card.kr]||""};
+}
+// reverse index: which other words in the deck share each hanja character
+const CHAR_WORDS = (function(){
+  const idx={};
+  for(const w in NOTES){
+    if(w.indexOf("__")===0) continue;
+    const h=NOTES[w].h; if(!h) continue;
+    for(const ch of h){ if(!/[一-鿿]/.test(ch)) continue;
+      (idx[ch]=idx[ch]||[]).push(w); }
+  }
+  return idx;
+})();
+// "解 풀 해 · 決 결단할 결" -> [{c:"解", kr:"풀 해"}, …]
+function charParts(word){
+  const n=NOTES[word]||{}; if(!n.h) return [];
+  const kr={};
+  if(n.p) for(const part of n.p.split("·")){
+    const t=part.trim(), m=t.match(/^([一-鿿])\s+(.+)$/);
+    if(m) kr[m[1]]=m[2];
+  }
+  const out=[], done=new Set();
+  for(const ch of n.h){
+    if(!/[一-鿿]/.test(ch)||done.has(ch)) continue;
+    done.add(ch);
+    out.push({c:ch, kr:kr[ch]||"", en:CHAR_EN[ch]||"",
+      also:(CHAR_WORDS[ch]||[]).filter(w=>w!==word).slice(0,4)});
+  }
+  return out;
+}
+// ---------- build word pool ----------
+let ALL=[];
+DECKS.forEach(d=>d.cards.forEach(c=>ALL.push({kr:c[0],en:c[1],ex:c[2]||"",star:!!c[3],pos:c[4]||"",deck:d.id})));
+function shortEn(e){
+  let s=e.replace(/\([^)]*\)/g,' ').replace(/\s{2,}/g,' ').trim();  // drop ANY (...) notes anywhere
+  if(!s) s=e.replace(/[()]/g,'').replace(/\s{2,}/g,' ').trim();     // gloss was ALL parenthetical: keep content
+  if(s.length<=30) return s.replace(/\s*;\s*/g,', ').trim();        // short enough: keep BOTH senses
+  let first=s.split(';')[0].trim();                                 // too long: first sense only
+  return first || s.replace(/\s*;\s*/g,', ').trim() || e.trim();
+}
+function poolFor(deckId, starOnly){
+  if(starOnly){                                  // too few starred words here? use them all instead
+    const s = poolFor(deckId, false).filter(c=>c.star);
+    return s.length >= 4 ? s : poolFor(deckId, false);
+  }
+  if(deckId==="grammar"){   // dedicated drill set: grammar patterns + phrases/idioms/expressions
+    return ALL.filter(c=>(c.pos==="grammar"||c.pos==="idiom"||c.pos==="expression"));
+  }
+  // Decks are the sections (they partition the words, so ALL has no duplicates). Virtual ids let one
+  // dropdown also offer a whole chapter ("ch:ch3") or one class across all chapters ("cls:v").
+  const inDeck = c =>
+      deckId==="all" ? true
+    : deckId.startsWith("ch:")  ? c.deck.startsWith(deckId.slice(3)+"-")
+    : deckId.startsWith("cls:") ? c.deck.endsWith("-"+deckId.slice(4))
+    : c.deck===deckId;
+  return ALL.filter(c=>{
+    if(!inDeck(c)) return false;
+    if(starOnly && !c.star) return false;
+    if(c.pos==="grammar") return false;
+    if(c.kr.length>15) return false;
+    if(shortEn(c.en).length>42) return false;
+    return true;
+  });
+}
+
+// ---------- canvas ----------
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+let W=0,H=0,DPR=1;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=window.innerWidth; H=window.innerHeight;
+  cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+"px"; cv.style.height=H+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener("resize",resize); resize();
+
+// ---------- stars bg ----------
+const stars=[]; for(let i=0;i<90;i++)stars.push({x:Math.random(),y:Math.random(),r:Math.random()*1.6+.3,s:Math.random()*.3+.05});
+
+// ---------- audio ----------
+let AC=null, muted=false;
+function actx(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} return AC; }
+function beep(freq,dur,type,vol){
+  if(muted)return; const a=actx(); if(!a)return;
+  const o=a.createOscillator(),g=a.createGain();
+  o.type=type||"square"; o.frequency.value=freq;
+  g.gain.value=vol||.06; o.connect(g); g.connect(a.destination);
+  const t=a.currentTime; o.start(t);
+  g.gain.setValueAtTime(g.gain.value,t); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.frequency.exponentialRampToValueAtTime(Math.max(60,freq*.5),t+dur);
+  o.stop(t+dur);
+}
+function noise(dur,vol,f0,f1){
+  if(muted)return; const a=actx(); if(!a)return;
+  const n=Math.floor(a.sampleRate*dur), buf=a.createBuffer(1,n,a.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/n,1.5);
+  const src=a.createBufferSource(); src.buffer=buf;
+  const flt=a.createBiquadFilter(); flt.type="lowpass";
+  const g=a.createGain(); g.gain.value=vol||.25;
+  const t=a.currentTime; flt.frequency.setValueAtTime(f0||2600,t);
+  flt.frequency.exponentialRampToValueAtTime(f1||300,t+dur);
+  src.connect(flt);flt.connect(g);g.connect(a.destination); src.start(t); src.stop(t+dur);
+}
+const sShoot=()=>beep(660,.08,"square",.05);
+function sHit(combo){ const pm=Math.pow(2,Math.min(combo||0,10)/12);        // pitch climbs with combo
+  noise(0.2,0.3,2900,240);                                                  // punchy boom
+  [784,1047,1319,1760].forEach((fr,i)=>setTimeout(()=>beep(fr*pm,.13,"triangle",.06),i*42)); } // rising sparkle
+const sMiss=()=>{noise(0.18,0.2,700,120);beep(150,.22,"sawtooth",.07);};
+const sLevel=()=>{[523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,.14,"triangle",.08),i*80));};
+
+// ---------- game state ----------
+const G={
+  state:"menu", pool:[], dir:"ko2en", starOnly:false, deck:"all",
+  score:0, best:0, hits:0, level:1, lives:3, combo:0, bestCombo:0,
+  uniq:new Set(), uniqTotal:0, uniqAwarded:false, masterAwarded:false,
+  monsters:[], target:null, correctIdx:0,
+  roundTime:7000, timeLeft:7000, resolving:false,
+  aim:{x:W/2,y:H/2}, particles:[], rings:[], flash:0, shake:0, popups:[], lastT:0, laser:0,
+  laserRGB:"80,170,255", bolts:[], frenzy:null, frenzyDone:false, vampHelp:null, vampBeam:null,
+  red:null, redDone:false, ghost:null, ghostPos:null, theme:"alien", ultra:false, ultraRun:null,
+  mode:"classic", mar:null, info:null
+};
+const STORM_RGB="80,170,255"; // frenzy storm is always blue
+const RED_RGB="255,60,80";    // ghost storm is always red
+
+// ---------- persistent miss counter (which words trouble you the most) ----------
+const MISS_KEY="k5b_blaster_misses_v1";
+let MISS=(function(){try{const s=localStorage.getItem(MISS_KEY);
+  if(s){const o=JSON.parse(s); if(o&&typeof o==="object")return o;}}catch(e){} return {};})();
+function missInc(kr){MISS[kr]=(MISS[kr]||0)+1;
+  try{localStorage.setItem(MISS_KEY,JSON.stringify(MISS));}catch(e){}}
+function topMissCard(){ // most-missed word available in the current pool, else random
+  let best=null,bn=0;
+  for(const c of G.pool){const n=MISS[c.kr]||0;if(n>bn){bn=n;best=c;}}
+  return best||pick(G.pool);
+}
+
+const PALETTE=["#ff6b8a","#ffb454","#5be0a8","#5b8cff","#c98bff","#4fd6e0","#ff8f5b","#8be04f"];
+
+function rnd(a,b){return a+Math.random()*(b-a);}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+
+function difficulty(){
+  const lv=G.level;
+  const choices=Math.min(4+Math.floor((lv-1)/2),7);   // start at 4, up to 7
+  const time=Math.max(2300,7500-(lv-1)*430);
+  const speed=(0.35+(lv-1)*0.11);
+  return {choices,time,speed};
+}
+
+// steer toward words not yet collected this run (still shows hit words — never locked out)
+const UNIQ_FORCE=0.6;
+function pickTarget(){
+  const unhit=G.pool.filter(c=>!G.uniq.has(c.kr));
+  if(unhit.length && Math.random()<UNIQ_FORCE) return pick(unhit);
+  return pick(G.pool);
+}
+function newRound(){
+  if(G.state!=="playing") return;                               // a stale timer fired after the run
+  if(G.mar&&!G.mar.queue.length){ finishMarathon(); return; }   // nothing left to ask
+  G.resolving=false;
+  const {choices,time,speed}=difficulty();
+  // choose target + distractors with distinct answers
+  // marathon takes the next word off the queue (no repeats); others pick randomly
+  const target=G.mar?G.mar.queue[0]:pickTarget();
+  const ansOf = c => G.dir==="ko2en"? shortEn(c.en) : c.kr;
+  const promptOf = c => G.dir==="ko2en"? c.kr : shortEn(c.en);
+  const used=new Set([ansOf(target)]);
+  const chosen=[target];
+  let guard=0;
+  while(chosen.length<choices && guard++<600){
+    const c=pick(G.pool); const a=ansOf(c);
+    if(used.has(a)) continue;
+    if(a.length>24 && guard<320) continue; // prefer shorter labels first
+    used.add(a); chosen.push(c);
+  }
+  // shuffle
+  for(let i=chosen.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[chosen[i],chosen[j]]=[chosen[j],chosen[i]];}
+  G.target=target; G.correctAns=ansOf(target);
+  G.promptWord=promptOf(target); G.promptPos=target.pos;
+  // spawn monsters
+  G.monsters=[];
+  const top=H*0.26, bot=H*0.9, margin=64;
+  const minDist=Math.max(94,150-choices*8);
+  const ib=infoBtn();
+  chosen.forEach((c,i)=>{
+    let x,y,ok,tries=0;
+    do{ x=rnd(margin,W-margin); y=rnd(top,bot); ok=true;
+        for(const m of G.monsters){ if(Math.hypot(m.x-x,m.y-y)<minDist){ok=false;break;} }
+        // keep the 📖 button clear of monsters in marathon
+        if(ok&&G.mar&&Math.hypot(ib.x-x,ib.y-y)<ib.r+70) ok=false;
+    }while(!ok && tries++<160);
+    const ang=rnd(0,Math.PI*2), sp=speed*rnd(.7,1.3);
+    G.monsters.push({
+      c, x,y, vx:Math.cos(ang)*sp*60, vy:Math.sin(ang)*sp*60,
+      r:rnd(34,42), color:PALETTE[i%PALETTE.length], wob:rnd(0,6.28),
+      label: G.dir==="ko2en"? shortEn(c.en) : c.kr,
+      correct: ansOf(c)===G.correctAns, dead:false, born:0, hitFx:0, revealGood:false
+    });
+  });
+  G.roundTime=time; G.timeLeft=time;
+  // vampire assist: with 5+ upgrades he very rarely (1%) snipes the word for you (not in ultra)
+  G.vampHelp=null;
+  if(CH.up>=5 && !G.ultraRun && Math.random()<0.01) G.vampHelp={delay:rnd(0.5,1.4),fired:false};
+  updateHUD();
+}
+
+function updateHUD(){
+  document.getElementById("lv").textContent=G.level;
+  document.getElementById("score").textContent=G.score;
+  document.getElementById("hearts").textContent="❤".repeat(Math.max(0,G.lives))+"♡".repeat(Math.max(0,3-G.lives));
+  document.getElementById("uniqStat").innerHTML="Unique <b>"+G.uniq.size+"</b> / "+G.uniqTotal;
+  document.getElementById("pword").textContent=G.promptWord||"";
+  document.getElementById("plabel").textContent = G.dir==="ko2en"? "shoot the meaning" : "shoot the word";
+  document.getElementById("ppos").textContent = G.dir==="ko2en" && G.promptPos ? G.promptPos : "";
+  const cs=document.getElementById("comboStat");
+  if(G.combo>=2){cs.style.opacity=1;document.getElementById("combo").textContent=G.combo;}else cs.style.opacity=0;
+  if(G.ultraRun){ // ultra HUD: bolt badge + progress instead of level/hearts
+    document.getElementById("lv").textContent="⚡";
+    document.getElementById("hearts").textContent=G.ultraRun.done+"/100";
+  }
+  if(G.mar){      // marathon HUD: book badge + words remaining
+    document.getElementById("lv").textContent="📖";
+    document.getElementById("hearts").textContent=G.mar.done+"/"+G.mar.total;
+    document.getElementById("uniqStat").innerHTML="남은 단어 <b>"+G.mar.queue.length+"</b>개";
+  }
+  // mastery chip: only in classic mode - ultra caps at 100 and marathon caps at one pass
+  const mh=document.getElementById("masteryHud");
+  if(G.ultraRun||G.mar||!G.uniqTotal){ mh.classList.add("hidden"); }
+  else{
+    const goal=G.uniqTotal*2;
+    mh.classList.remove("hidden");
+    if(G.hits>=goal){ mh.classList.add("done"); mh.innerHTML="🏆 MASTERED"; }
+    else{ mh.classList.remove("done"); mh.innerHTML="Mastery <b>"+G.hits+"</b> / "+goal; }
+  }
+  updateChampHud();
+}
+
+// ---------- resolve a shot ----------
+function shootAt(px,py){
+  if(G.state!=="playing"||G.info) return;
+  if(G.frenzy){ frenzyShoot(px,py); return; }
+  if(G.red){ redShoot(px,py); return; }
+  if(G.mar){ marathonShoot(px,py); return; }
+  if(G.resolving) return;
+  sShoot(); G.laser=1;
+  // find topmost monster hit
+  let hitM=null;
+  for(let i=G.monsters.length-1;i>=0;i--){
+    const m=G.monsters[i]; if(m.dead) continue;
+    if(Math.hypot(m.x-px,m.y-py)<=m.r+6){ hitM=m; break; }
+  }
+  if(!hitM) return; // missed empty space: no penalty, just a shot
+  if(G.ultraRun){ if(hitM.correct)ultraHit(hitM); else ultraWrong(hitM); return; }
+  if(hitM.correct){ resolveCorrectHit(hitM); }
+  else {
+    // wrong monster
+    hitM.hitFx=1; sMiss(); G.shake=16; G.combo=0;
+    loseLife();
+  }
+}
+// ---------- MARATHON 완주 (study room: every word once, no repeats, no lives) ----------
+function infoBtn(){ return {x:W-52,y:Math.max(150,H*0.19),r:27}; }
+function marathonShoot(px,py){
+  const b=infoBtn();
+  if(Math.hypot(b.x-px,b.y-py)<=b.r+8){ openInfo(); return; }   // shot the 📖 button
+  if(G.resolving) return;
+  sShoot(); G.laser=1;
+  let hitM=null;
+  for(let i=G.monsters.length-1;i>=0;i--){const m=G.monsters[i];if(m.dead)continue;
+    if(Math.hypot(m.x-px,m.y-py)<=m.r+6){hitM=m;break;}}
+  if(!hitM) return;
+  const mar=G.mar;
+  if(hitM.correct){
+    hitM.dead=true; boom(hitM.x,hitM.y,hitM.color); thunder(hitM.x,hitM.y);
+    mar.queue.shift(); mar.done++; G.hits++; G.uniq.add(G.target.kr);
+    G.combo++; G.bestCombo=Math.max(G.bestCombo,G.combo); sHit(G.combo);
+    popup("+"+(mar.done)+"/"+mar.total,hitM.x,hitM.y,"#37d18f");
+    G.resolving=true; updateHUD();
+    if(!mar.queue.length){ setTimeout(finishMarathon,900); return; }
+    setTimeout(newRound,420);
+  } else {
+    // no life lost — the missed word goes to the back of the queue to come around again
+    hitM.hitFx=1; sMiss(); G.shake=12; G.combo=0; mar.wrongs++; missInc(G.target.kr);
+    const cm=G.monsters.find(m=>m.correct); if(cm)cm.revealGood=true;
+    showToast(); G.resolving=true;
+    mar.queue.push(mar.queue.shift());
+    popup("다시 만나요!",hitM.x,hitM.y,"#ffb0c0");
+    updateHUD(); setTimeout(newRound,1500);
+  }
+}
+function finishMarathon(){
+  const mar=G.mar; if(!mar)return;      // already finished (a queued timer fired late)
+  G.mar=null; G.state="over";
+  const secs=Math.round((Date.now()-mar.t0)/1000);
+  const mm=Math.floor(secs/60), ss=String(secs%60).padStart(2,"0");
+  CH.coins+=30; saveCH(); sLevel();
+  document.getElementById("finalScore").textContent="📖 "+mar.total;
+  document.getElementById("finalLv").textContent="MARATHON 완주!";
+  document.getElementById("finalHits").textContent=mar.total;
+  document.getElementById("finalUniq").textContent=mar.total+"/"+mar.total;
+  document.getElementById("finalCombo").textContent=G.bestCombo;
+  document.getElementById("bestScore").textContent=mm+":"+ss;
+  document.getElementById("missLine").textContent=
+    "틀린 답 "+mar.wrongs+"회 · 설명 열어보기 "+mar.looks+"회 · 걸린 시간 "+mm+"분 "+ss+"초 · +30🪙";
+  renderChamp("champBox2");
+  hud.classList.add("hidden"); overScreen.classList.remove("hidden");
+}
+// ---- word explanation panel ----
+function simpleEnglish(text){         // find hard English words and explain them plainly
+  const out=[], seen=new Set();
+  const words=String(text).toLowerCase().match(/[a-z-]+/g)||[];
+  for(const w of words){
+    if(seen.has(w))continue;
+    const def=EN_SIMPLE[w]||EN_SIMPLE[w.replace(/s$/,"")]||EN_SIMPLE[w.replace(/ed$/,"")];
+    if(def){seen.add(w);out.push([w,def]);}
+  }
+  return out;
+}
+function openInfo(){
+  const c=G.target; if(!c)return;
+  if(G.mar)G.mar.looks++;
+  G.info=c; beep(880,.12,"triangle",.05);
+  const n=NOTES[c.kr]||{};
+  const easy=simpleEnglish(c.en+" "+(n.e||""));
+  let h='<div class="iword">'+esc(c.kr)+'</div><div class="ipos">'+esc(c.pos||"")+'</div>';
+  h+='<div class="isec"><div class="ilab">뜻 · meaning</div><div class="ival">'+esc(c.en)+'</div></div>';
+  if(n.e&&n.e!==c.en) h+='<div class="isec"><div class="ilab">더 자세히 · in full</div><div class="ival">'+esc(n.e)+'</div></div>';
+  if(easy.length) h+='<div class="isec"><div class="ilab">쉬운 영어 · easy English</div><div class="ien">'+
+    easy.map(e=>'<div><b>'+esc(e[0])+'</b> = '+esc(e[1])+'</div>').join("")+'</div></div>';
+  if(n.nat) h+='<div class="isec"><div class="inat">🇰🇷 순우리말 — 한자가 없는 고유어입니다.'+
+    '<span> a native Korean word, not built from hanja</span></div></div>';
+  if(n.h){
+    h+='<div class="isec"><div class="ilab">한자 · hanja</div><div class="ihanja">'+esc(n.h)+'</div>';
+    // one row per character: reading, English meaning, and other words using it
+    for(const p of charParts(c.kr)){
+      h+='<div class="ichar"><div class="cbig">'+esc(p.c)+'</div><div class="cbody">';
+      if(p.kr) h+='<div class="ckr">'+esc(p.kr)+'</div>';
+      if(p.en) h+='<div class="cen">'+esc(p.en)+'</div>';
+      if(p.also.length) h+='<div class="calso">같은 한자: <b>'+p.also.map(esc).join("</b>, <b>")+'</b></div>';
+      h+='</div></div>';
+    }
+    h+='</div>';
+  }
+  if(n.n) h+='<div class="isec"><div class="ilab">설명 · notes</div><div class="ival">'+esc(n.n)+'</div></div>';
+  const xp=exampleParts(c);
+  if(xp) h+='<div class="isec"><div class="ilab">예문 · example</div><div class="iex">'+esc(xp.kr)+'</div>'+
+    (xp.en?'<div class="iexen">'+esc(xp.en)+'</div>':'')+'</div>';
+  if(!n.h&&!n.n) h+='<div class="isec"><div class="inone">이 단어는 아직 자세한 설명이 없어요. (한자가 없는 순우리말일 수도 있어요!)</div></div>';
+  h+='<button class="iclose">계속하기 ▶</button>';
+  const box=document.getElementById("infoBox"); box.innerHTML=h;
+  box.onclick=e=>{ if(e.target.classList.contains("iclose"))closeInfo(); else e.stopPropagation(); };
+  document.getElementById("infoOv").classList.remove("hidden");
+}
+function closeInfo(){ G.info=null; document.getElementById("infoOv").classList.add("hidden"); }
+document.getElementById("infoOv").onclick=closeInfo;
+
+// ---------- ULTRA 100 (time attack: instant next word, no timer, no lives) ----------
+function ultraElapsed(){const u=G.ultraRun;return (Date.now()-u.t0)/1000+u.penalty;}
+function fmtT(t){const m2=Math.floor(t/60);return m2+":"+(t-m2*60).toFixed(1).padStart(4,"0");}
+function ultraHit(m){
+  m.dead=true; boom(m.x,m.y,m.color); thunder(m.x,m.y);
+  const u=G.ultraRun; u.done++; G.hits++; G.uniq.add(G.target.kr);
+  sHit(u.done%20);
+  G.level=Math.min(8,1+Math.floor(u.done/12));   // difficulty ramps with progress
+  if(u.done>=100){ finishUltra(); return; }
+  newRound();                                    // ZERO downtime
+  updateHUD();
+}
+function ultraWrong(m){
+  const u=G.ultraRun;
+  m.hitFx=1; u.wrongs++; u.penalty+=2; missInc(G.target.kr);
+  sMiss(); G.shake=10;
+  popup("+2s",m.x,m.y,"#ff6b8a");
+}
+function finishUltra(){
+  const u=G.ultraRun; G.ultraRun=null;
+  const t=(Date.now()-u.t0)/1000+u.penalty;
+  let best=NaN; try{best=parseFloat(localStorage.getItem("k5b_ultra_best"));}catch(e){}
+  const isBest=!(best>0)||t<best;
+  if(isBest){try{localStorage.setItem("k5b_ultra_best",String(t));}catch(e){}}
+  CH.coins+=20; saveCH();
+  G.state="over"; sLevel();
+  document.getElementById("finalScore").textContent="⚡ "+fmtT(t);
+  document.getElementById("finalLv").textContent="ULTRA 100";
+  document.getElementById("finalHits").textContent=100;
+  document.getElementById("finalUniq").textContent=G.uniq.size+"/"+G.uniqTotal;
+  document.getElementById("finalCombo").textContent="—";
+  document.getElementById("bestScore").textContent=fmtT(isBest?t:best);
+  document.getElementById("missLine").textContent=
+    "틀린 클릭 "+u.wrongs+"회 (+"+(u.wrongs*2)+"s) · +20🪙"+(isBest?" · 🏆 NEW BEST!":"");
+  renderChamp("champBox2");
+  hud.classList.add("hidden"); overScreen.classList.remove("hidden");
+}
+// shared by the player's shot and the vampire's strike
+function resolveCorrectHit(hitM){
+    hitM.dead=true; boom(hitM.x,hitM.y,hitM.color); thunder(hitM.x,hitM.y);
+    G.hits++; G.combo++; G.bestCombo=Math.max(G.bestCombo,G.combo);
+    sHit(G.combo);
+    const gain=100+G.combo*10+G.level*5;
+    G.score+=gain;
+    const hot=G.combo>=5;
+    popup("+"+gain+(hot?" ×"+G.combo:""),hitM.x,hitM.y,hot?"#ffd85c":"#37d18f",false,1+Math.min(G.combo,10)*0.07);
+    if(hot)G.rings.push({x:hitM.x,y:hitM.y,r:6,max:150,life:1,color:"#ffd85c"});
+    // ghost quest: killing HIS word pays a life (3 times), then he leaves with 10 coins
+    if(G.ghost && hitM.c && hitM.c.kr===G.ghost.kr){
+      G.ghost.granted++; G.lives++;
+      popup("👻 +1❤ ("+G.ghost.granted+"/3)",hitM.x,hitM.y-44,"#ff6b8a");
+      if(G.ghost.granted>=3){
+        CH.coins+=10; saveCH(); updateChampHud();
+        popup("👻 QUEST COMPLETE! +10🪙",W/2,H*0.4,"#ffd85c",true);
+        G.ghost=null; G.ghostPos=null;
+      }
+    }
+    // track unique words hit (does NOT affect which words are chosen)
+    G.uniq.add(G.target.kr);
+    if(!G.uniqAwarded && G.uniqTotal>0 && G.uniq.size>=G.uniqTotal){
+      G.uniqAwarded=true;
+      const bonus=1000+G.uniqTotal*20; G.score+=bonus; G.lives+=1;
+      popup("ALL "+G.uniqTotal+" WORDS! +"+bonus+"  +1❤",W/2,H*0.42,"#ffd85c",true);
+      sLevel(); G.shake=18; G.flash=Math.min(1,G.flash+.7);
+    }
+    // mastery: the whole deck, twice over
+    if(!G.masterAwarded && !G.ultraRun && !G.mar && G.uniqTotal>0 && G.hits>=G.uniqTotal*2){
+      G.masterAwarded=true;
+      const mb=2000+G.uniqTotal*30; G.score+=mb; G.lives+=1;
+      popup("🏆 MASTERED!",W/2,H*0.34,"#ffd85c",true,1.5);
+      popup("all "+G.uniqTotal+" words, twice over  +"+mb+"  +1❤",W/2,H*0.45,"#ffd85c");
+      sLevel(); setTimeout(sLevel,260);
+      G.shake=24; G.flash=Math.min(1,G.flash+.9);
+      for(let i=0;i<3;i++) G.rings.push({x:W/2,y:H*0.40,r:6+i*40,max:420,life:1,color:"#ffd85c"});
+    }
+    G.resolving=true;
+    const leveled = (G.hits%10===0);
+    let combatDue=false;
+    if(leveled){
+      G.level++; sLevel(); popup("LEVEL "+G.level+"!",W/2,H*0.5,"#ffd85c",true); G.shake=14;
+      const cGain=4+G.level;                       // level-up pay for the champion
+      CH.coins+=cGain; saveCH(); sCoin();
+      popup("+"+cGain+" 🪙",W/2,H*0.6,"#ffd85c");
+      combatDue=((G.level-1)%5===0);               // after completing levels 5, 10, 15…
+    }
+    const frenzyDue=(G.level===3&&!G.frenzyDone);  // after completing level 2, once per run
+    const redDue=(G.level===4&&!G.redDone);        // after completing level 3, once per run
+    if(frenzyDue) setTimeout(startFrenzy,1100);
+    else if(redDue) setTimeout(startRedStorm,1100);
+    else if(combatDue) setTimeout(startCombat,1100);
+    else setTimeout(newRound, leveled?1100:360);
+    updateHUD();
+}
+
+function loseLife(){
+  G.resolving=true; G.lives--; missInc(G.target.kr); updateHUD();
+  // reveal correct monster
+  const cm=G.monsters.find(m=>m.correct); if(cm) cm.revealGood=true;
+  showToast();
+  if(G.lives<=0){ setTimeout(gameOver,900); }
+  else setTimeout(newRound,1000);
+}
+
+function timeUp(){
+  if(G.resolving)return;
+  sMiss(); G.shake=10; G.combo=0; loseLife();
+}
+
+function showToast(){
+  const t=document.getElementById("toast");
+  t.innerHTML='<span class="k">'+esc(G.target.kr)+'</span> &nbsp;=&nbsp; <span class="e">'+esc(shortEn(G.target.en))+'</span>';
+  t.classList.add("show"); clearTimeout(showToast._t);
+  showToast._t=setTimeout(()=>t.classList.remove("show"),1500);
+}
+
+// ---------- particles / juice ----------
+function explode(x,y,color,n){
+  for(let i=0;i<n;i++){const a=rnd(0,6.28),s=rnd(60,260);
+    G.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color,r:rnd(2,5)});}
+}
+function boom(x,y,color){
+  // chunky colored debris
+  for(let i=0;i<32;i++){const a=rnd(0,6.28),s=rnd(90,400);
+    G.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color,r:rnd(3,7),g:1});}
+  // fast white sparks
+  for(let i=0;i<12;i++){const a=rnd(0,6.28),s=rnd(240,560);
+    G.particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color:"#ffffff",r:rnd(1.5,3.5),g:.25,spark:true});}
+  // shockwave rings
+  G.rings.push({x,y,r:6,max:100,life:1,color});
+  G.rings.push({x,y,r:6,max:66,life:1,color:"#ffffff"});
+  G.flash=Math.min(1,G.flash+.6);
+  G.shake=Math.max(G.shake,9);
+}
+function popup(text,x,y,color,big,scale){ G.popups.push({text,x,y,color,life:1,big:!!big,vy:-40,scale:scale||1}); }
+// short lightning burst on a correct hit (~0.25s, doesn't delay the next round)
+function thunder(x,y){
+  for(let i=0;i<5;i++){
+    const pts=[{x,y}]; let a=rnd(0,6.28), px=x, py=y;
+    const segs=5+Math.floor(rnd(0,3));
+    for(let s=0;s<segs;s++){ a+=rnd(-0.55,0.55); const len=rnd(12,26);
+      px+=Math.cos(a)*len; py+=Math.sin(a)*len; pts.push({x:px,y:py}); }
+    G.bolts.push({pts,life:1,w:rnd(1.5,3)});
+  }
+  noise(0.07,0.32,7000,1500); // crack
+}
+// full-height background strike for the frenzy storm
+function skyStrike(rgb){
+  const x0=rnd(W*0.08,W*0.92); let px=x0,py=-10; const pts=[{x:px,y:py}];
+  const endY=rnd(H*0.45,H*0.85);
+  while(py<endY){ px+=rnd(-34,34); py+=rnd(36,70); pts.push({x:px,y:py}); }
+  G.bolts.push({pts,life:1,w:rnd(2,3.4),rgb:rgb||STORM_RGB});
+  G.flash=Math.min(1,G.flash+.22);
+  noise(0.25,0.22,1200,90); // rolling rumble
+}
+
+// ---------- THUNDER FRENZY (one-shot bonus round after completing level 2) ----------
+function startFrenzy(){
+  if(G.state!=="playing")return;
+  G.frenzyDone=true;
+  G.frenzy={phase:"intro",t:0,kills:0,timeLeft:3.0,strikeT:0};
+  G.monsters=[]; G.promptWord=""; G.promptPos=""; updateHUD();
+  noise(0.5,0.3,700,60); // storm rolls in
+  setTimeout(frenzyBegin,2400);
+}
+function frenzyBegin(){
+  if(!G.frenzy||G.state!=="playing")return;
+  G.frenzy.phase="play"; G.frenzy.timeLeft=3.0;
+  spawnFrenzyMonsters(); frenzyNextTarget();
+}
+function spawnFrenzyMonsters(){
+  const ansOf=c=>G.dir==="ko2en"?shortEn(c.en):c.kr;
+  const used=new Set(), chosen=[]; let guard=0;
+  while(chosen.length<10&&guard++<800){const c=pick(G.pool);const a=ansOf(c);
+    if(used.has(a))continue; used.add(a); chosen.push(c);}
+  G.monsters=[];
+  const top=H*0.30,bot=H*0.88,margin=60,minDist=Math.max(70,Math.min(130,Math.sqrt(W*(bot-top)/14)));
+  chosen.forEach((c,i)=>{let x,y,ok,tries=0;
+    do{x=rnd(margin,W-margin);y=rnd(top,bot);ok=true;
+      for(const m of G.monsters){if(Math.hypot(m.x-x,m.y-y)<minDist){ok=false;break;}}
+    }while(!ok&&tries++<200);
+    G.monsters.push({c,x,y,vx:0,vy:0,r:rnd(28,33),color:PALETTE[i%PALETTE.length],wob:rnd(0,6.28),
+      label:ansOf(c),correct:false,dead:false,born:0,hitFx:0,revealGood:false});
+  });
+}
+function frenzyNextTarget(){
+  const alive=G.monsters.filter(m=>!m.dead);
+  if(!alive.length){endFrenzy(true);return;}
+  const tm=pick(alive);
+  G.target=tm.c;
+  G.promptWord=(G.dir==="ko2en")?tm.c.kr:shortEn(tm.c.en); G.promptPos=tm.c.pos;
+  G.monsters.forEach(m=>m.correct=(m===tm));
+  updateHUD();
+}
+function frenzyShoot(px,py){
+  if(!G.frenzy||G.frenzy.phase!=="play")return;
+  sShoot(); G.laser=1;
+  let hitM=null;
+  for(let i=G.monsters.length-1;i>=0;i--){const m=G.monsters[i];if(m.dead)continue;
+    if(Math.hypot(m.x-px,m.y-py)<=m.r+6){hitM=m;break;}}
+  if(!hitM)return; // empty air: no penalty
+  if(hitM.correct){
+    hitM.dead=true; boom(hitM.x,hitM.y,hitM.color); thunder(hitM.x,hitM.y); sHit(G.frenzy.kills+3);
+    G.frenzy.kills++; G.score+=300; G.uniq.add(hitM.c.kr);
+    popup("+300",hitM.x,hitM.y,"#8be0ff");
+    frenzyNextTarget();
+  } else {
+    hitM.hitFx=1; sMiss(); G.shake=12;
+    endFrenzy(false);
+  }
+}
+function endFrenzy(cleared){
+  const f=G.frenzy; if(!f)return;
+  G.frenzy=null;
+  const k=f.kills;
+  if(cleared===true&&k>=10){ G.score+=1000;
+    popup("PERFECT STORM! ×"+k+" +1000",W/2,H*0.45,"#8be0ff",true); sLevel();
+  } else if(k>0){
+    popup("FRENZY ×"+k+"  +"+(k*300)+"점",W/2,H*0.45,"#8be0ff",true);
+  } else {
+    popup("THE STORM PASSES…",W/2,H*0.45,"#8ea0c8",true);
+  }
+  if(k>0){ CH.coins+=k*2; saveCH(); popup("+"+(k*2)+" 🪙",W/2,H*0.55,"#ffd85c"); }
+  G.monsters=[]; updateHUD(); updateChampHud();
+  setTimeout(newRound,1000);
+}
+
+// ---------- RED STORM (one-shot redemption round after completing level 3) ----------
+// Challenges you with your MOST-MISSED word; win it to befriend the red ghost.
+function startRedStorm(){
+  if(G.state!=="playing")return;
+  G.redDone=true;
+  G.red={phase:"intro",t:0,timeLeft:10,strikeT:0,card:topMissCard()};
+  G.monsters=[]; G.promptWord=""; G.promptPos=""; updateHUD();
+  noise(0.5,0.3,500,50);
+  setTimeout(redBegin,2400);
+}
+function redBegin(){
+  if(!G.red||G.state!=="playing")return;
+  G.red.phase="play"; G.red.timeLeft=10;
+  const card=G.red.card, ansOf=c=>G.dir==="ko2en"?shortEn(c.en):c.kr, good=ansOf(card);
+  let imp=null,guard=0;
+  while(guard++<400){const c=pick(G.pool);if(ansOf(c)!==good){imp=c;break;}}
+  G.monsters=[];
+  const top=H*0.30,bot=H*0.88,margin=60,minDist=Math.max(70,Math.min(130,Math.sqrt(W*(bot-top)/14)));
+  const badIdx=Math.floor(rnd(0,10));
+  for(let i=0;i<10;i++){
+    let x,y,ok,tries=0;
+    do{x=rnd(margin,W-margin);y=rnd(top,bot);ok=true;
+      for(const m of G.monsters){if(Math.hypot(m.x-x,m.y-y)<minDist){ok=false;break;}}
+    }while(!ok&&tries++<200);
+    const bad=(i===badIdx);
+    G.monsters.push({c:bad?imp:card,x,y,vx:0,vy:0,r:rnd(28,33),color:PALETTE[i%PALETTE.length],wob:rnd(0,6.28),
+      label:bad?ansOf(imp):good,correct:!bad,dead:false,born:0,hitFx:0,revealGood:false});
+  }
+  G.target=card;
+  G.promptWord=(G.dir==="ko2en")?card.kr:shortEn(card.en); G.promptPos=card.pos;
+  updateHUD();
+}
+function redShoot(px,py){
+  if(!G.red||G.red.phase!=="play")return;
+  sShoot(); G.laser=1;
+  let hitM=null;
+  for(let i=G.monsters.length-1;i>=0;i--){const m=G.monsters[i];if(m.dead)continue;
+    if(Math.hypot(m.x-px,m.y-py)<=m.r+6){hitM=m;break;}}
+  if(!hitM)return; // empty air is safe
+  if(hitM.correct){
+    hitM.dead=true; boom(hitM.x,hitM.y,"#ff5b73"); thunder(hitM.x,hitM.y);
+    G.red.kills=(G.red.kills||0)+1; sHit(G.red.kills+2);
+    const left=G.monsters.filter(m=>m.correct&&!m.dead).length;
+    if(left===0){ sLevel(); endRedStorm(true); }        // only the liar remains
+    else popup(left+" left",hitM.x,hitM.y,"#ffb0c0");
+  } else {
+    hitM.hitFx=1; sMiss(); G.shake=12;
+    endRedStorm(false);
+  }
+}
+function endRedStorm(won){
+  const rd=G.red; if(!rd)return; G.red=null;
+  if(won){
+    G.ghost={kr:rd.card.kr,granted:0};
+    G.ghostPos={x:W*0.5,y:H*0.5,vx:40,vy:26};
+    popup("👻 GHOST BEFRIENDED!",W/2,H*0.42,"#ff6b8a",true);
+    popup("hit 「"+rd.card.kr+"」 → +1❤ (×3)",W/2,H*0.55,"#ffb0c0");
+  } else {
+    popup("THE GHOST FADES…",W/2,H*0.45,"#8ea0c8",true);
+  }
+  G.monsters=[]; updateHUD();
+  setTimeout(newRound,1000);
+}
+function drawGhost(){
+  const g=G.ghostPos; if(!g)return;
+  const t=G.lastT/1000, x=g.x, y=g.y+Math.sin(t*2.2)*8, r=16;
+  ctx.save();
+  ctx.globalAlpha=0.72+Math.sin(t*3)*0.08;
+  ctx.shadowColor="rgba(255,40,70,.9)"; ctx.shadowBlur=14;
+  ctx.fillStyle="rgba(255,70,90,.85)";
+  ctx.beginPath();
+  ctx.arc(x,y-4,r,Math.PI,0);
+  ctx.lineTo(x+r,y+12);
+  const seg=(2*r)/3;
+  for(let i=0;i<3;i++) ctx.quadraticCurveTo(x+r-seg*i-seg/2,y+19,x+r-seg*(i+1),y+12);
+  ctx.closePath(); ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle="#fff";
+  ctx.beginPath();ctx.arc(x-5,y-7,3.4,0,6.28);ctx.fill();
+  ctx.beginPath();ctx.arc(x+5,y-7,3.4,0,6.28);ctx.fill();
+  ctx.fillStyle="#7a0d20";
+  ctx.beginPath();ctx.arc(x-5,y-6,1.7,0,6.28);ctx.fill();
+  ctx.beginPath();ctx.arc(x+5,y-6,1.7,0,6.28);ctx.fill();
+  ctx.restore();
+}
+
+// ---------- loop ----------
+function frame(t){
+  const dt=Math.min(.05,(t-G.lastT)/1000||0); G.lastT=t;
+  // update
+  if(G.state==="playing"&&G.frenzy){
+    const f=G.frenzy; f.t+=dt;
+    f.strikeT-=dt;
+    if(f.strikeT<=0){ skyStrike(); if(f.phase==="intro"&&Math.random()<0.35)skyStrike();
+      f.strikeT=(f.phase==="intro")?rnd(0.08,0.22):rnd(0.45,1.0); }
+    if(f.phase==="play"){
+      f.timeLeft-=dt;
+      const frac=Math.max(0,f.timeLeft/3), tb=document.getElementById("tbar");
+      tb.style.width=(frac*100)+"%";
+      tb.style.background="linear-gradient(90deg,#4fb8ff,#8be0ff)";
+      if(f.timeLeft<=0) endFrenzy(false);
+    }
+  }
+  if(G.state==="playing"&&G.red){
+    const f=G.red; f.t+=dt; f.strikeT-=dt;
+    if(f.strikeT<=0){ skyStrike(RED_RGB); if(f.phase==="intro"&&Math.random()<0.35)skyStrike(RED_RGB);
+      f.strikeT=(f.phase==="intro")?rnd(0.08,0.22):rnd(0.45,1.0); }
+    if(f.phase==="play"){
+      f.timeLeft-=dt;
+      const frac=Math.max(0,f.timeLeft/10), tb=document.getElementById("tbar");
+      tb.style.width=(frac*100)+"%";
+      tb.style.background="linear-gradient(90deg,#ff5b73,#ffb0c0)";
+      if(f.timeLeft<=0) endRedStorm(false);
+    }
+  }
+  if(G.state==="playing"&&G.ultraRun){ // live stopwatch + progress bar
+    document.getElementById("score").textContent=fmtT(ultraElapsed());
+    const tb=document.getElementById("tbar");
+    tb.style.width=G.ultraRun.done+"%";
+    tb.style.background="linear-gradient(90deg,#8be0ff,#37d18f)";
+  }
+  if(G.state==="playing"&&G.mar){   // progress bar instead of a countdown
+    const tb=document.getElementById("tbar");
+    tb.style.width=(G.mar.done/G.mar.total*100)+"%";
+    tb.style.background="linear-gradient(90deg,#8be0ff,#37d18f)";
+  }
+  if(G.state==="playing"&&!G.resolving&&!G.frenzy&&!G.red&&!G.ultraRun&&!G.mar){
+    G.timeLeft-=dt*1000;
+    if(G.timeLeft<=0){ G.timeLeft=0; timeUp(); }
+  }
+  if(G.state==="playing"&&!G.frenzy&&!G.red&&!G.ultraRun) vampTick(dt);
+  if(G.state==="playing"&&!G.frenzy&&!G.red&&G.ghost&&G.ghostPos){
+    const g=G.ghostPos;
+    g.x+=g.vx*dt; g.y+=g.vy*dt;
+    const gt=H*0.28,gb=H*0.85,mar=30;
+    if(g.x<mar){g.x=mar;g.vx*=-1;} if(g.x>W-mar){g.x=W-mar;g.vx*=-1;}
+    if(g.y<gt){g.y=gt;g.vy*=-1;} if(g.y>gb){g.y=gb;g.vy*=-1;}
+  }
+  if(G.state==="playing"){
+    const bnd=20;
+    for(const m of G.monsters){
+      if(m.dead) continue; m.born=Math.min(1,m.born+dt*4); m.wob+=dt*4;
+      if(!G.resolving&&!G.info){
+        m.x+=m.vx*dt; m.y+=m.vy*dt;
+        const top=H*0.24,bot=H*0.9;
+        if(m.x<bnd){m.x=bnd;m.vx*=-1;} if(m.x>W-bnd){m.x=W-bnd;m.vx*=-1;}
+        if(m.y<top){m.y=top;m.vy*=-1;} if(m.y>bot){m.y=bot;m.vy*=-1;}
+      }
+      if(m.hitFx>0)m.hitFx=Math.max(0,m.hitFx-dt*2);
+    }
+    // timer bar (frenzy/red storm/ultra/marathon drive their own bars)
+    if(!G.frenzy&&!G.red&&!G.ultraRun&&!G.mar){
+      const frac=G.timeLeft/G.roundTime;
+      const tb=document.getElementById("tbar"); tb.style.width=(frac*100)+"%";
+      tb.style.background= frac>.5?"linear-gradient(90deg,#37d18f,#7be0a8)": frac>.25?"linear-gradient(90deg,#ffd85c,#ffb454)":"linear-gradient(90deg,#ff6b8a,#ff3b5b)";
+    }
+  }
+  // particles
+  for(const p of G.particles){ p.x+=p.vx*dt;p.y+=p.vy*dt; p.vx*=0.99;
+    p.vy+=260*dt*(p.g==null?1:p.g); p.life-=dt*(p.spark?2.4:1.35); }
+  G.particles=G.particles.filter(p=>p.life>0);
+  // shockwave rings + hit flash
+  for(const r of G.rings){ r.life-=dt*2.3; r.r=r.max*(1-Math.max(0,r.life)); }
+  G.rings=G.rings.filter(r=>r.life>0);
+  if(G.flash>0)G.flash=Math.max(0,G.flash-dt*4);
+  for(const q of G.popups){ q.y+=q.vy*dt; q.life-=dt*(q.big?0.7:1.1); }
+  G.popups=G.popups.filter(q=>q.life>0);
+  if(G.shake>0)G.shake=Math.max(0,G.shake-dt*40);
+  if(G.laser>0)G.laser=Math.max(0,G.laser-dt*6);
+  for(const b of G.bolts) b.life-=dt*4.5;
+  G.bolts=G.bolts.filter(b=>b.life>0);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // bg gradient
+  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,"#0a1024");g.addColorStop(1,"#05070f");
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // stars
+  ctx.save();
+  for(const s of stars){ s.y+=s.s*0.0015; if(s.y>1)s.y=0;
+    ctx.globalAlpha=0.4+s.r*0.3; ctx.fillStyle="#cdd8ff";
+    ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r,0,6.28);ctx.fill(); }
+  ctx.restore();
+
+  let ox=0,oy=0; if(G.shake>0){ox=rnd(-G.shake,G.shake);oy=rnd(-G.shake,G.shake);}
+  ctx.save(); ctx.translate(ox,oy);
+
+  if(G.state==="playing"){
+    // storm blackout (under monsters, over stars) — frenzy is blue-lit, red storm reddish
+    if(G.frenzy||G.red){
+      const ph=(G.frenzy||G.red).phase;
+      ctx.fillStyle=G.red?"rgba(8,0,3,"+(ph==="intro"?0.88:0.72)+")"
+                        :"rgba(0,0,6,"+(ph==="intro"?0.88:0.72)+")";
+      ctx.fillRect(-30,-30,W+60,H+60);
+    }
+    // monsters
+    for(const m of G.monsters){
+      if(m.dead) continue;
+      drawMonster(m);
+    }
+    // frenzy boss-fight intro card
+    if(G.frenzy&&G.frenzy.phase==="intro"){
+      const t=G.frenzy.t, pulse=1+Math.sin(t*6)*0.045;
+      ctx.textAlign="center";
+      ctx.shadowColor="rgba("+STORM_RGB+",1)"; ctx.shadowBlur=28;
+      ctx.fillStyle="#bfe4ff";
+      ctx.font="900 "+Math.round(Math.min(46,W*0.07)*pulse)+"px -apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillText("⚡ THUNDER FRENZY ⚡",W/2,H*0.40);
+      ctx.shadowBlur=0;
+      ctx.fillStyle="#9fc4e8"; ctx.font="600 16px -apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillText("10 monsters · 3 seconds · one wrong hit ends it",W/2,H*0.40+36);
+      ctx.fillStyle="#eaf0fb"; ctx.font="900 30px -apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillText(String(Math.max(1,Math.ceil(2.4-t))),W/2,H*0.40+82);
+    }
+    // red storm boss-fight intro card
+    if(G.red&&G.red.phase==="intro"){
+      const t=G.red.t, pulse=1+Math.sin(t*6)*0.045;
+      ctx.textAlign="center";
+      ctx.shadowColor="rgba("+RED_RGB+",1)"; ctx.shadowBlur=28;
+      ctx.fillStyle="#ffc4cd";
+      ctx.font="900 "+Math.round(Math.min(46,W*0.07)*pulse)+"px -apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillText("👻 RED STORM 👻",W/2,H*0.40);
+      ctx.shadowBlur=0;
+      ctx.fillStyle="#e8a0ac"; ctx.font="600 16px -apple-system,'Malgun Gothic',Segoe UI,Roboto,sans-serif";
+      ctx.fillText("your nemesis word returns · 9 speak the truth · 1 lies",W/2,H*0.40+36);
+      ctx.fillText("10 seconds — blast all 9 truths, never touch the liar",W/2,H*0.40+58);
+      ctx.fillStyle="#eaf0fb"; ctx.font="900 30px -apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillText(String(Math.max(1,Math.ceil(2.4-t))),W/2,H*0.40+100);
+    }
+    // red ghost companion roaming the field
+    if(G.ghost&&!G.frenzy&&!G.red) drawGhost();
+    // 📖 explanation button (marathon) — always drawn on top of the monsters
+    if(G.mar){
+      const b=infoBtn(), pulse=1+Math.sin(G.lastT/400)*0.05;
+      ctx.save();
+      ctx.shadowColor="rgba(139,224,255,.9)";ctx.shadowBlur=16;
+      ctx.fillStyle="rgba(16,28,52,.95)";ctx.strokeStyle="#8be0ff";ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(b.x,b.y,b.r*pulse,0,6.28);ctx.fill();ctx.stroke();
+      ctx.shadowBlur=0;
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.font="24px -apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillText("📖",b.x,b.y+1);
+      ctx.font="700 10px -apple-system,Segoe UI,Roboto,sans-serif";
+      ctx.fillStyle="#8be0ff";ctx.fillText("설명",b.x,b.y+b.r+10);
+      ctx.textBaseline="alphabetic";ctx.restore();
+    }
+    // laser + gun (color rolled per run: blue or red)
+    if(G.laser>0){
+      ctx.beginPath(); ctx.moveTo(W/2,H+10); ctx.lineTo(G.aim.x,G.aim.y);
+      ctx.strokeStyle="rgba("+G.laserRGB+","+(G.laser)+")"; ctx.lineWidth=5;
+      ctx.shadowColor="rgba("+G.laserRGB+",1)"; ctx.shadowBlur=10; ctx.stroke();
+      ctx.shadowBlur=0;
+      ctx.strokeStyle="rgba(255,255,255,"+(G.laser*0.9)+")"; ctx.lineWidth=1.8; ctx.stroke();
+    }
+    // floating vampire helper + his crimson beam
+    if(CH.up>=5&&!G.frenzy&&!G.red){
+      const vy=VAMP.y+Math.sin(VAMP.bob)*6;
+      ctx.drawImage(VSPR,VAMP.x-24,vy-24,48,48);
+    }
+    if(G.vampBeam){const b=G.vampBeam;
+      ctx.globalAlpha=Math.max(0,b.life);
+      ctx.beginPath();ctx.moveTo(b.x1,b.y1);ctx.lineTo(b.x2,b.y2);
+      ctx.strokeStyle="rgba(255,40,70,1)";ctx.lineWidth=5;
+      ctx.shadowColor="rgba(255,40,70,1)";ctx.shadowBlur=12;ctx.stroke();
+      ctx.shadowBlur=0;ctx.strokeStyle="#fff";ctx.lineWidth=1.6;ctx.stroke();
+      ctx.globalAlpha=1;
+    }
+  }
+  // shockwave rings
+  for(const r of G.rings){ ctx.globalAlpha=Math.max(0,r.life);ctx.strokeStyle=r.color;
+    ctx.lineWidth=r.life*5+1; ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,6.28);ctx.stroke(); }
+  ctx.globalAlpha=1;
+  // particles
+  for(const p of G.particles){ ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r*(p.spark?p.life:1),0,6.28);ctx.fill(); }
+  ctx.globalAlpha=1;
+  // lightning bolts (correct-hit thunder)
+  for(const b of G.bolts){ const al=Math.max(0,b.life);
+    ctx.globalAlpha=al; ctx.lineJoin="round";
+    ctx.beginPath(); ctx.moveTo(b.pts[0].x,b.pts[0].y);
+    for(const p of b.pts) ctx.lineTo(p.x,p.y);
+    const brgb=b.rgb||G.laserRGB;
+    ctx.strokeStyle="rgba("+brgb+",1)"; ctx.lineWidth=b.w*2.6*al+1;
+    ctx.shadowColor="rgba("+brgb+",1)"; ctx.shadowBlur=12; ctx.stroke();
+    ctx.shadowBlur=0;
+    ctx.strokeStyle="#fff"; ctx.lineWidth=b.w*al+0.5; ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  // popups
+  for(const q of G.popups){ ctx.globalAlpha=Math.max(0,q.life);
+    ctx.fillStyle=q.color; ctx.textAlign="center";
+    ctx.font=(q.big?"900 ":"800 ")+Math.round((q.big?44:24)*(q.scale||1))+"px -apple-system,Segoe UI,Roboto,sans-serif";
+    ctx.fillText(q.text,q.x,q.y); }
+  ctx.globalAlpha=1;
+  ctx.restore();
+
+  // fever glow at combo 5+ (pulsing golden vignette)
+  if(G.state==="playing"&&G.combo>=5){
+    const va=0.10+0.05*Math.sin(G.lastT/180);
+    const vg=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.38,W/2,H/2,Math.max(W,H)*0.72);
+    vg.addColorStop(0,"rgba(255,200,60,0)"); vg.addColorStop(1,"rgba(255,180,60,"+va+")");
+    ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+  }
+
+  // hit flash (subtle screen pop)
+  if(G.flash>0){ ctx.fillStyle="rgba(255,255,255,"+(G.flash*0.12)+")"; ctx.fillRect(0,0,W,H); }
+
+  // crosshair
+  if(G.state==="playing"){
+    const a=G.aim; ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(a.x,a.y,13,0,6.28);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(a.x-20,a.y);ctx.lineTo(a.x-6,a.y);
+    ctx.moveTo(a.x+6,a.y);ctx.lineTo(a.x+20,a.y);
+    ctx.moveTo(a.x,a.y-20);ctx.lineTo(a.x,a.y-6);
+    ctx.moveTo(a.x,a.y+6);ctx.lineTo(a.x,a.y+20);ctx.stroke();
+    ctx.fillStyle="rgba("+G.laserRGB+",.95)";ctx.beginPath();ctx.arc(a.x,a.y,2.2,0,6.28);ctx.fill();
+  }
+}
+
+// ---------- enemy themes (one rolled per playthrough) ----------
+const THEME_NAMES={alien:"👾 외계인",ghost:"👻 유령",cat:"🐱 고양이",robot:"🤖 로봇",pumpkin:"🎃 호박",eye:"👁 눈알"};
+function eyePair(x,ey,r,off,er){ // two white eyes with crosshair-tracking pupils
+  ctx.fillStyle="#fff";
+  ctx.beginPath();ctx.arc(x-r*off,ey,r*er,0,6.28);ctx.fill();
+  ctx.beginPath();ctx.arc(x+r*off,ey,r*er,0,6.28);ctx.fill();
+  const dx=G.aim.x-x,dy=G.aim.y-ey,dd=Math.hypot(dx,dy)||1,pp=r*0.08;
+  ctx.fillStyle="#12203a";
+  ctx.beginPath();ctx.arc(x-r*off+dx/dd*pp,ey+dy/dd*pp,r*er*0.5,0,6.28);ctx.fill();
+  ctx.beginPath();ctx.arc(x+r*off+dx/dd*pp,ey+dy/dd*pp,r*er*0.5,0,6.28);ctx.fill();
+}
+const drawBody={
+ alien(x,y,r,col){
+  ctx.fillStyle=col;
+  ctx.beginPath();ctx.moveTo(x,y-r);
+  ctx.bezierCurveTo(x+r*1.15,y-r,x+r*1.15,y+r*0.7,x+r*0.6,y+r*0.95);
+  ctx.bezierCurveTo(x+r*0.3,y+r*1.15,x-r*0.3,y+r*1.15,x-r*0.6,y+r*0.95);
+  ctx.bezierCurveTo(x-r*1.15,y+r*0.7,x-r*1.15,y-r,x,y-r);ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(x-r*0.45,y+r*1.0,r*0.18,0,6.28);ctx.fill();
+  ctx.beginPath();ctx.arc(x+r*0.45,y+r*1.0,r*0.18,0,6.28);ctx.fill();
+  eyePair(x,y-r*0.05,r,0.32,0.24);
+  ctx.strokeStyle="rgba(0,0,0,.4)";ctx.lineWidth=2;ctx.beginPath();
+  ctx.arc(x,y+r*0.42,r*0.22,0.15*Math.PI,0.85*Math.PI);ctx.stroke();
+ },
+ ghost(x,y,r,col){
+  ctx.globalAlpha*=0.92;
+  ctx.fillStyle=col;
+  ctx.beginPath();ctx.arc(x,y-r*0.15,r,Math.PI,0);
+  ctx.lineTo(x+r,y+r*0.7);
+  const seg=(2*r)/3;
+  for(let i=0;i<3;i++)ctx.quadraticCurveTo(x+r-seg*i-seg/2,y+r*1.05,x+r-seg*(i+1),y+r*0.7);
+  ctx.closePath();ctx.fill();ctx.shadowBlur=0;
+  eyePair(x,y-r*0.22,r,0.35,0.22);
+  ctx.fillStyle="#12203a";ctx.beginPath();ctx.arc(x,y+r*0.22,r*0.14,0,6.28);ctx.fill();
+ },
+ cat(x,y,r,col){
+  ctx.fillStyle=col;
+  ctx.beginPath();ctx.moveTo(x-r*0.85,y-r*0.35);ctx.lineTo(x-r*0.55,y-r*1.25);ctx.lineTo(x-r*0.15,y-r*0.75);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(x+r*0.85,y-r*0.35);ctx.lineTo(x+r*0.55,y-r*1.25);ctx.lineTo(x+r*0.15,y-r*0.75);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.arc(x,y,r,0,6.28);ctx.fill();ctx.shadowBlur=0;
+  ctx.fillStyle="rgba(0,0,0,.25)";
+  ctx.beginPath();ctx.moveTo(x-r*0.7,y-r*0.5);ctx.lineTo(x-r*0.55,y-r*1.0);ctx.lineTo(x-r*0.3,y-r*0.7);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(x+r*0.7,y-r*0.5);ctx.lineTo(x+r*0.55,y-r*1.0);ctx.lineTo(x+r*0.3,y-r*0.7);ctx.closePath();ctx.fill();
+  eyePair(x,y-r*0.1,r,0.38,0.2);
+  ctx.fillStyle="#12203a";
+  ctx.beginPath();ctx.moveTo(x-r*0.09,y+r*0.2);ctx.lineTo(x+r*0.09,y+r*0.2);ctx.lineTo(x,y+r*0.34);ctx.closePath();ctx.fill();
+  ctx.strokeStyle="rgba(0,0,0,.45)";ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(x-r*0.16,y+r*0.38,r*0.16,0.1*Math.PI,0.9*Math.PI);ctx.stroke();
+  ctx.beginPath();ctx.arc(x+r*0.16,y+r*0.38,r*0.16,0.1*Math.PI,0.9*Math.PI);ctx.stroke();
+  ctx.beginPath();
+  for(const sd of[-1,1])for(let i=0;i<3;i++){
+    ctx.moveTo(x+sd*r*0.38,y+r*(0.16+i*0.12));ctx.lineTo(x+sd*r*1.08,y+r*(0.02+i*0.17));}
+  ctx.stroke();
+ },
+ robot(x,y,r,col){
+  ctx.strokeStyle=col;ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(x,y-r*0.9);ctx.lineTo(x,y-r*1.3);ctx.stroke();
+  ctx.fillStyle="#ffd85c";ctx.beginPath();ctx.arc(x,y-r*1.42,r*0.13,0,6.28);ctx.fill();
+  ctx.fillStyle=col;
+  roundRect(x-r*0.95,y-r*0.9,r*1.9,r*1.8,r*0.25);ctx.fill();ctx.shadowBlur=0;
+  ctx.fillStyle="rgba(8,12,24,.75)";
+  roundRect(x-r*0.65,y-r*0.5,r*1.3,r*0.62,r*0.14);ctx.fill();
+  const dx=G.aim.x-x,dy=G.aim.y-y,dd=Math.hypot(dx,dy)||1,pp=r*0.07;
+  ctx.fillStyle="#8be0ff";
+  ctx.fillRect(x-r*0.44+dx/dd*pp,y-r*0.34+dy/dd*pp,r*0.24,r*0.24);
+  ctx.fillRect(x+r*0.2+dx/dd*pp,y-r*0.34+dy/dd*pp,r*0.24,r*0.24);
+  ctx.strokeStyle="rgba(0,0,0,.5)";ctx.lineWidth=2;
+  ctx.beginPath();for(let i=-1;i<=1;i++){ctx.moveTo(x+i*r*0.22,y+r*0.35);ctx.lineTo(x+i*r*0.22,y+r*0.62);}ctx.stroke();
+  ctx.fillStyle="rgba(0,0,0,.35)";
+  ctx.beginPath();ctx.arc(x-r*0.78,y+r*0.05,r*0.09,0,6.28);ctx.fill();
+  ctx.beginPath();ctx.arc(x+r*0.78,y+r*0.05,r*0.09,0,6.28);ctx.fill();
+ },
+ pumpkin(x,y,r,col){
+  ctx.fillStyle="#37d18f";ctx.fillRect(x-r*0.08,y-r*1.12,r*0.16,r*0.32);
+  ctx.fillStyle=col;
+  ctx.beginPath();ctx.ellipse(x,y,r*1.05,r*0.88,0,0,6.28);ctx.fill();ctx.shadowBlur=0;
+  ctx.strokeStyle="rgba(0,0,0,.22)";ctx.lineWidth=2;
+  for(const w of[0.38,0.72]){ctx.beginPath();ctx.ellipse(x,y,r*w,r*0.88,0,0,6.28);ctx.stroke();}
+  ctx.fillStyle="#12203a";
+  ctx.beginPath();ctx.moveTo(x-r*0.48,y-r*0.08);ctx.lineTo(x-r*0.15,y-r*0.08);ctx.lineTo(x-r*0.31,y-r*0.42);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(x+r*0.48,y-r*0.08);ctx.lineTo(x+r*0.15,y-r*0.08);ctx.lineTo(x+r*0.31,y-r*0.42);ctx.closePath();ctx.fill();
+  ctx.beginPath();ctx.moveTo(x-r*0.52,y+r*0.28);
+  for(let i=0;i<4;i++)ctx.lineTo(x-r*0.52+r*0.26*(i+1),y+r*(i%2?0.28:0.5));
+  ctx.lineTo(x+r*0.52,y+r*0.4);ctx.closePath();ctx.fill();
+ },
+ eye(x,y,r,col){
+  ctx.fillStyle="#f2f4ff";ctx.beginPath();ctx.arc(x,y,r,0,6.28);ctx.fill();ctx.shadowBlur=0;
+  ctx.strokeStyle="rgba(255,60,80,.5)";ctx.lineWidth=1.6;
+  ctx.beginPath();
+  for(let i=0;i<4;i++){const a=(i/4)*6.28+0.55;
+    ctx.moveTo(x+Math.cos(a)*r*0.55,y+Math.sin(a)*r*0.55);ctx.lineTo(x+Math.cos(a)*r*0.92,y+Math.sin(a)*r*0.92);}
+  ctx.stroke();
+  const dx=G.aim.x-x,dy=G.aim.y-y,dd=Math.hypot(dx,dy)||1,pp=r*0.3;
+  const ix=x+dx/dd*pp, iy=y+dy/dd*pp;
+  ctx.fillStyle=col;ctx.beginPath();ctx.arc(ix,iy,r*0.42,0,6.28);ctx.fill();
+  ctx.fillStyle="#12203a";ctx.beginPath();ctx.arc(ix,iy,r*0.2,0,6.28);ctx.fill();
+  ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(ix-r*0.07,iy-r*0.07,r*0.06,0,6.28);ctx.fill();
+ }
+};
+function drawMonster(m){
+  const s=m.born, bob=Math.sin(m.wob)*4;
+  const x=m.x, y=m.y+bob, r=m.r*s;
+  ctx.save();
+  // glow / hit flash
+  if(m.revealGood){ ctx.shadowColor="#37d18f"; ctx.shadowBlur=28; }
+  else if(m.hitFx>0){ ctx.shadowColor="#ff3b5b"; ctx.shadowBlur=30*m.hitFx; }
+  else { ctx.shadowColor=m.color; ctx.shadowBlur=14; }
+  let col=m.color; if(m.revealGood)col="#37d18f"; if(m.hitFx>0)col="#ff5b73";
+  (drawBody[G.theme]||drawBody.alien)(x,y,r,col);
+  ctx.restore();
+
+  // label tag above head (kept on-screen; condensed if long)
+  const label=m.label;
+  ctx.font="700 "+Math.round(19*Math.max(.8,s))+"px -apple-system,'Malgun Gothic',Segoe UI,Roboto,sans-serif";
+  const padX=10, tagH=28, maxInner=Math.min(W-24,380);
+  const tw=Math.min(ctx.measureText(label).width,maxInner), tagW=tw+padX*2, ty=y-r-tagH-6;
+  const cx=Math.max(tagW/2+6,Math.min(W-tagW/2-6,x));   // clamp so the tag stays on screen
+  ctx.fillStyle="rgba(8,12,24,.85)"; ctx.strokeStyle=m.revealGood?"#37d18f":"rgba(120,140,190,.5)"; ctx.lineWidth=1.5;
+  roundRect(cx-tagW/2,ty,tagW,tagH,8); ctx.fill(); ctx.stroke();
+  ctx.fillStyle= m.revealGood?"#8ff5c8":"#eef3ff"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(label,cx,ty+tagH/2+1,tw);
+  ctx.textBaseline="alphabetic";
+  ctx.strokeStyle="rgba(120,140,190,.4)";ctx.beginPath();ctx.moveTo(cx,ty+tagH);ctx.lineTo(x,y-r+2);ctx.stroke();
+}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+function esc(s){return String(s).replace(/[&<>]/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[x]));}
+
+// ---------- champion metagame ----------
+// Persists across runs via localStorage when available (file:// works);
+// inside a sandboxed artifact the try/catch silently degrades to session-only.
+const CH_KEY="k5b_blaster_champion_v1";
+const FN1=["Gna","Vor","Zug","Mok","Bel","Kra","Thu","Rag","Ulm","Dro"],
+      FN2=["rak","gor","mash","zil","dun","goth","nax","ler","bok","vex"];
+function genFoe(rank){const hp=Math.round(60*Math.pow(1.65,rank-1));
+  return {rank,name:pick(FN1)+pick(FN2),hue:Math.floor(rnd(0,360)),
+    eyes:1+Math.floor(rnd(0,3)),horn:Math.random()<0.6,maxHp:hp,hp:hp};}
+let CH=(function(){try{const s=localStorage.getItem(CH_KEY);
+  if(s){const o=JSON.parse(s);if(o&&o.foe&&typeof o.coins==="number")return o;}}catch(e){}
+  return {coins:0,up:0,wins:0,foe:genFoe(1)};})();
+function saveCH(){try{localStorage.setItem(CH_KEY,JSON.stringify(CH));}catch(e){}}
+const chPower=()=>2+CH.up;
+const chCost=()=>Math.round(10*Math.pow(1.55,CH.up));
+const sCoin=()=>{[1319,1760].forEach((f,i)=>setTimeout(()=>beep(f,.09,"triangle",.07),i*70));};
+const sClash=()=>{noise(0.12,0.25,1800,300);beep(220,.1,"sawtooth",.05);};
+
+function drawCritter(c,o){ // mini blob renderer for champion/foe sprites
+  const x2=c.getContext("2d"),S=c.width;x2.clearRect(0,0,S,S);
+  x2.save();if(o.flip){x2.translate(S,0);x2.scale(-1,1);}
+  const x=S/2,y=S/2+S*0.06,r=S*0.3,col=o.color||("hsl("+o.hue+",70%,62%)");
+  if(o.aura){ // blood mist for the vampire, gold ring otherwise
+    x2.strokeStyle=o.vamp?"rgba(255,30,60,.55)":"rgba(255,216,92,.8)";
+    x2.lineWidth=2.5;x2.shadowColor=o.vamp?"rgba(255,0,40,.9)":"rgba(255,216,92,.9)";x2.shadowBlur=8;
+    x2.beginPath();x2.arc(x,y,r+7,0,6.28);x2.stroke();x2.shadowBlur=0;}
+  if(o.wings){ // bat wings, unfurled behind
+    x2.fillStyle="rgba(20,6,26,.92)";
+    for(const s of [-1,1]){
+      x2.beginPath();
+      x2.moveTo(x+s*r*0.5,y-r*0.25);
+      x2.quadraticCurveTo(x+s*r*1.9,y-r*1.3,x+s*r*2.02,y-r*0.15);
+      x2.lineTo(x+s*r*1.55,y-r*0.05);
+      x2.lineTo(x+s*r*1.62,y+r*0.45);
+      x2.lineTo(x+s*r*1.05,y+r*0.28);
+      x2.closePath();x2.fill();
+    }}
+  if(o.cape){ // high-collared cape
+    x2.fillStyle="rgba(30,8,20,.9)";
+    x2.beginPath();
+    x2.moveTo(x-r*1.25,y+r*0.9);
+    x2.quadraticCurveTo(x,y-r*1.6,x+r*1.25,y+r*0.9);
+    x2.lineTo(x+r*0.75,y+r*0.55);x2.lineTo(x+r*0.4,y+r*0.98);
+    x2.lineTo(x,y+r*0.6);x2.lineTo(x-r*0.4,y+r*0.98);x2.lineTo(x-r*0.75,y+r*0.55);
+    x2.closePath();x2.fill();}
+  x2.fillStyle=col;
+  if(o.horn){
+    x2.beginPath();x2.moveTo(x-r*0.55,y-r*0.75);x2.lineTo(x-r*0.85,y-r*1.5);x2.lineTo(x-r*0.15,y-r*0.95);x2.fill();
+    x2.beginPath();x2.moveTo(x+r*0.55,y-r*0.75);x2.lineTo(x+r*0.85,y-r*1.5);x2.lineTo(x+r*0.15,y-r*0.95);x2.fill();}
+  x2.beginPath();x2.moveTo(x,y-r);
+  x2.bezierCurveTo(x+r*1.15,y-r,x+r*1.15,y+r*0.7,x+r*0.6,y+r*0.95);
+  x2.bezierCurveTo(x+r*0.3,y+r*1.15,x-r*0.3,y+r*1.15,x-r*0.6,y+r*0.95);
+  x2.bezierCurveTo(x-r*1.15,y+r*0.7,x-r*1.15,y-r,x,y-r);x2.fill();
+  if(o.vamp){ // slicked hair with widow's peak
+    x2.fillStyle="rgba(15,5,20,.95)";
+    x2.beginPath();x2.moveTo(x-r*0.78,y-r*0.70);
+    x2.quadraticCurveTo(x-r*0.3,y-r*0.52,x,y-r*0.26);
+    x2.quadraticCurveTo(x+r*0.3,y-r*0.52,x+r*0.78,y-r*0.70);
+    x2.quadraticCurveTo(x+r*0.35,y-r*1.06,x,y-r*1.03);
+    x2.quadraticCurveTo(x-r*0.35,y-r*1.06,x-r*0.78,y-r*0.70);
+    x2.closePath();x2.fill();}
+  const n=o.eyes||2,ey=y-r*0.05;
+  for(let i=0;i<n;i++){const ex=x+(n===1?0:(i/(n-1)-0.5)*r*0.9);
+    x2.fillStyle="#fff";x2.beginPath();x2.arc(ex,ey,r*0.2,0,6.28);x2.fill();
+    if(o.eyeRed){x2.fillStyle="#e01030";x2.shadowColor="#ff2040";x2.shadowBlur=6;}
+    else x2.fillStyle="#12203a";
+    x2.beginPath();x2.arc(ex,ey+r*0.05,r*0.1,0,6.28);x2.fill();x2.shadowBlur=0;}
+  x2.strokeStyle="rgba(0,0,0,.4)";x2.lineWidth=2;x2.beginPath();x2.arc(x,y+r*0.42,r*0.2,0.15*Math.PI,0.85*Math.PI);x2.stroke();
+  if(o.fangs){ // two little fangs under the grin
+    x2.fillStyle="#fff";
+    for(const s of [-1,1]){const fx=x+s*r*0.13;
+      x2.beginPath();x2.moveTo(fx-r*0.055,y+r*0.42);x2.lineTo(fx+r*0.055,y+r*0.42);
+      x2.lineTo(fx,y+r*0.64);x2.closePath();x2.fill();}}
+  x2.restore();
+}
+// the champion is a vampire: the more he's upgraded, the darker and more evil he looks
+const drawChampInto=c=>{
+  const up=CH.up,t=Math.min(up,10)/10,L=(a,b)=>Math.round(a+(b-a)*t);
+  const col="rgb("+L(198,84)+","+L(150,14)+","+L(216,36)+")"; // pale lavender -> dark blood
+  drawCritter(c,{color:col,eyes:2,vamp:true,fangs:true,
+    cape:up>=2,eyeRed:up>=4,wings:up>=5,aura:up>=8});
+};
+const drawFoeInto=c=>{const f=CH.foe;drawCritter(c,{hue:f.hue,eyes:f.eyes,horn:f.horn,flip:true});};
+
+function renderChamp(id){
+  const box=document.getElementById(id); if(!box)return;
+  const f=CH.foe,cost=chCost(),can=CH.coins>=cost;
+  box.innerHTML='<div class="cpanel">'
+    +'<div class="ccol"><canvas class="cspr" width="72" height="72"></canvas>'
+    +'<div class="cname">your champion</div>'
+    +'<div class="cstat">⚔ <b>'+chPower()+'</b> · 🪙 <b>'+CH.coins+'</b></div>'
+    +(CH.up>=5?'<div class="cstat">🦇 battlefield ally</div>'
+              :'<div class="cstat" style="color:#7d8bb0">🦇 awakens at 5 upgrades</div>')
+    +'<button class="cup'+(can?'':' cant')+'">Upgrade +1⚔ · 🪙'+cost+'</button></div>'
+    +'<div class="cvs">VS</div>'
+    +'<div class="ccol"><canvas class="cspr" width="72" height="72"></canvas>'
+    +'<div class="cname">'+esc(f.name)+' · rank '+f.rank+'</div>'
+    +'<div class="chpbar"><div class="chpfill" style="width:'+Math.max(2,f.hp/f.maxHp*100)+'%"></div></div>'
+    +'<div class="cstat">HP <b>'+f.hp+'</b>/'+f.maxHp+'</div>'
+    +(CH.wins?'<div class="cstat">foes defeated: <b>'+CH.wins+'</b></div>':'')
+    +'</div>';
+  const sprs=box.querySelectorAll(".cspr");drawChampInto(sprs[0]);drawFoeInto(sprs[1]);
+  box.querySelector(".cup").onclick=()=>{
+    if(CH.coins<chCost())return;
+    CH.coins-=chCost();CH.up++;saveCH();sCoin();
+    renderChamp("champBox");renderChamp("champBox2");updateChampHud();renderVampSpr();
+  };
+}
+function updateChampHud(){
+  const p=document.getElementById("powHud"),cn=document.getElementById("coinHud");
+  if(p)p.textContent=chPower(); if(cn)cn.textContent=CH.coins;
+}
+
+// ---------- floating vampire helper (unlocked at 5 upgrades) ----------
+const VAMP={x:0,y:0,bob:0};
+const VSPR=document.createElement("canvas"); VSPR.width=VSPR.height=84;
+function renderVampSpr(){ drawChampInto(VSPR); }
+const sVamp=()=>{beep(980,.18,"sawtooth",.05);setTimeout(()=>beep(490,.15,"sawtooth",.05),90);noise(0.1,0.2,3000,600);};
+function vampTick(dt){
+  if(G.vampBeam){G.vampBeam.life-=dt*4; if(G.vampBeam.life<=0)G.vampBeam=null;}
+  if(CH.up<5) return;
+  VAMP.bob+=dt*2;
+  let tx=W-64, ty=H*0.26;                       // idle perch, top-right under the HUD
+  const h=G.vampHelp;
+  if(h&&!G.resolving){
+    h.delay-=dt;
+    if(h.delay<=0){
+      const cm=G.monsters.find(m=>m.correct&&!m.dead);
+      if(!cm){ G.vampHelp=null; }
+      else{
+        tx=cm.x; ty=cm.y-86;                    // swoop above the target
+        if(!h.fired && Math.hypot(VAMP.x-tx,VAMP.y-ty)<26){
+          h.fired=true; G.vampHelp=null;
+          G.vampBeam={x1:VAMP.x,y1:VAMP.y+16,x2:cm.x,y2:cm.y,life:1};
+          sVamp(); popup("🧛 STRIKE!",cm.x,cm.y-44,"#ff4f6b");
+          resolveCorrectHit(cm);
+        }
+      }
+    }
+  } else if(h&&G.resolving){ G.vampHelp=null; } // round already over, stand down
+  VAMP.x+=(tx-VAMP.x)*Math.min(1,dt*5);
+  VAMP.y+=(ty-VAMP.y)*Math.min(1,dt*5);
+}
+
+function startCombat(){
+  if(G.state!=="playing"){return;}
+  const ov=document.getElementById("combatOv"),f=CH.foe;
+  const cs=document.getElementById("cbChamp"),fs=document.getElementById("cbFoe");
+  drawChampInto(cs);drawFoeInto(fs);
+  document.getElementById("cbTitle").textContent="⚔ "+f.name+" · rank "+f.rank;
+  document.getElementById("cbLog").textContent="your champion attacks!";
+  const hpEl=document.getElementById("cbHp");
+  hpEl.style.width=Math.max(2,f.hp/f.maxHp*100)+"%";
+  ov.classList.remove("hidden");
+  let step=0;
+  const iv=setInterval(()=>{
+    step++;
+    const crit=Math.random()<0.25, dmg=chPower()+(crit?Math.ceil(chPower()*0.5):0);
+    f.hp=Math.max(0,f.hp-dmg); saveCH(); sClash();
+    cs.classList.add("lunge"); fs.classList.add("hurt");
+    setTimeout(()=>{cs.classList.remove("lunge");fs.classList.remove("hurt");},220);
+    hpEl.style.width=Math.max(0,f.hp/f.maxHp*100)+"%";
+    document.getElementById("cbLog").textContent="−"+dmg+(crit?" CRIT!":"");
+    if(f.hp<=0){
+      clearInterval(iv);
+      const loot=Math.round(20*Math.pow(1.5,f.rank));
+      CH.coins+=loot; CH.wins++; CH.foe=genFoe(f.rank+1); saveCH();
+      document.getElementById("cbLog").textContent="DEFEATED! +"+loot+" 🪙 +1❤";
+      G.lives++; updateHUD(); updateChampHud(); sLevel();
+      boom(W/2,120,"#ffd85c");
+      setTimeout(endCombat,1400);
+    } else if(step>=3){
+      clearInterval(iv);
+      document.getElementById("cbLog").textContent=f.name+" survives… upgrade & return!";
+      setTimeout(endCombat,1100);
+    }
+  },850);
+}
+function endCombat(){
+  document.getElementById("combatOv").classList.add("hidden");
+  updateChampHud();
+  if(G.state==="playing") newRound();
+}
+
+// ---------- input ----------
+function pointerPos(e){const r=cv.getBoundingClientRect();
+  const t=e.touches?e.touches[0]:e; return {x:t.clientX-r.left,y:t.clientY-r.top};}
+cv.addEventListener("mousemove",e=>{G.aim=pointerPos(e);});
+cv.addEventListener("mousedown",e=>{G.aim=pointerPos(e);shootAt(G.aim.x,G.aim.y);});
+cv.addEventListener("touchstart",e=>{e.preventDefault();G.aim=pointerPos(e);shootAt(G.aim.x,G.aim.y);},{passive:false});
+cv.addEventListener("touchmove",e=>{e.preventDefault();G.aim=pointerPos(e);},{passive:false});
+
+// ---------- screens ----------
+const startScreen=document.getElementById("startScreen"),overScreen=document.getElementById("overScreen"),hud=document.getElementById("hud"),muteBtn=document.getElementById("muteBtn");
+// deck dropdown
+(function(){const sel=document.getElementById("deckSel");
+  const opt=(v,t)=>{const k=poolFor(v,false).length; return k>=4 ? '<option value="'+v+'">'+t+' ('+k+')</option>' : "";};
+  let o='<option value="all">All words ('+poolFor("all",false).length+')</option>';
+  o+=opt("grammar","\u2726 Grammar &amp; phrases");
+  o+='<optgroup label="\uacfc \u00b7 chapter">';
+  CHAPTERS.forEach(ch=>{ o+=opt("ch:"+ch.id, ch.title+" "+ch.theme); });
+  o+='</optgroup><optgroup label="\uc218\uc5c5 \u00b7 class">';
+  CLASSES.forEach(cl=>{ o+=opt("cls:"+cl.suffix, cl.title+" \u2014 \uc804\uccb4"); });
+  o+='</optgroup><optgroup label="\uc138\ubd80 \u00b7 section">';
+  DECKS.forEach(d=>{ o+=opt(d.id, d.title); });
+  o+='</optgroup>';
+  sel.innerHTML=o;})();
+
+document.getElementById("dirToggle").onclick=()=>{
+  G.dir = G.dir==="ko2en"?"en2ko":"ko2en";
+  document.getElementById("dirText").textContent = G.dir==="ko2en"?"Korean → English":"English → Korean";
+};
+document.getElementById("starToggle").onclick=()=>{
+  G.starOnly=!G.starOnly; document.getElementById("starText").textContent=G.starOnly?"on":"off";
+};
+const MODES=["classic","ultra","marathon"];
+const MODE_LABEL={classic:"Classic",ultra:"⚡ Ultra 100",marathon:"📖 Marathon (완주)"};
+document.getElementById("ultraToggle").onclick=()=>{
+  G.mode=MODES[(MODES.indexOf(G.mode)+1)%MODES.length];
+  G.ultra=(G.mode==="ultra");
+  document.getElementById("ultraText").textContent=MODE_LABEL[G.mode];
+};
+muteBtn.onclick=()=>{muted=!muted;muteBtn.textContent=muted?"🔇":"🔊";};
+
+function startGame(){
+  G.deck=document.getElementById("deckSel").value;
+  G.pool=poolFor(G.deck,G.starOnly);
+  if(G.pool.length<4){ alert("Not enough words for this filter — pick a bigger set."); return; }
+  G.uniqTotal=new Set(G.pool.map(c=>c.kr)).size;
+  actx(); if(AC&&AC.state==="suspended")AC.resume();
+  G.score=0;G.hits=0;G.level=1;G.lives=3;G.combo=0;G.bestCombo=0;G.uniq=new Set();G.uniqAwarded=false;G.masterAwarded=false;G.particles=[];G.rings=[];G.flash=0;G.popups=[];G.bolts=[];G.resolving=false;G.frenzy=null;G.frenzyDone=false;
+  G.vampHelp=null;G.vampBeam=null;VAMP.x=W-64;VAMP.y=H*0.26;renderVampSpr();
+  G.red=null;G.redDone=false;G.ghost=null;G.ghostPos=null;
+  G.ultraRun = (G.mode==="ultra") ? {done:0,wrongs:0,penalty:0,t0:Date.now()} : null;
+  G.info=null; document.getElementById("infoOv").classList.add("hidden");
+  if(G.mode==="marathon"){                       // one queue holding every unique word, shuffled
+    const seen=new Set(), q=[];
+    for(const c of G.pool){ if(!seen.has(c.kr)){ seen.add(c.kr); q.push(c); } }
+    for(let i=q.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[q[i],q[j]]=[q[j],q[i]];}
+    G.mar={queue:q,total:q.length,done:0,wrongs:0,looks:0,t0:Date.now()};
+  } else G.mar=null;
+  G.laserRGB = Math.random()<0.5 ? "80,170,255" : "255,70,90";   // blue or red run
+  G.theme = pick(Object.keys(drawBody));                          // tonight's invaders
+  G.state="playing";
+  startScreen.classList.add("hidden"); overScreen.classList.add("hidden");
+  hud.classList.remove("hidden"); muteBtn.classList.remove("hidden");
+  newRound();
+  popup(THEME_NAMES[G.theme]+" 습격!",W/2,H*0.34,"#8be0ff",true);
+}
+function gameOver(){
+  G.state="over"; G.best=Math.max(G.best,G.score);
+  document.getElementById("finalScore").textContent=G.score;
+  document.getElementById("finalLv").textContent="Level "+G.level;
+  document.getElementById("finalHits").textContent=G.hits;
+  document.getElementById("finalUniq").textContent=G.uniq.size+"/"+G.uniqTotal;
+  document.getElementById("finalCombo").textContent=G.bestCombo;
+  document.getElementById("bestScore").textContent=G.best;
+  let mk=null,mn=0; for(const k in MISS){ if(MISS[k]>mn){mn=MISS[k];mk=k;} }
+  document.getElementById("missLine").textContent = mk?("😵 most missed: "+mk+" ("+mn+"×)"):"";
+  renderChamp("champBox2");
+  hud.classList.add("hidden"); overScreen.classList.remove("hidden");
+}
+document.getElementById("startBtn").onclick=startGame;
+document.getElementById("againBtn").onclick=startGame;
+document.getElementById("menuBtn").onclick=()=>{overScreen.classList.add("hidden");startScreen.classList.remove("hidden");muteBtn.classList.add("hidden");G.state="menu";renderChamp("champBox");};
+
+// deep links from the study plan: ?deck=ch5v&mode=marathon&dir=ko2en&star=1
+(function(){
+  const q=new URLSearchParams(location.search);
+  const m=q.get("mode");
+  if(m&&MODES.indexOf(m)>=0){ G.mode=m; G.ultra=(m==="ultra");
+    document.getElementById("ultraText").textContent=MODE_LABEL[m]; }
+  const dk=q.get("deck"), sel=document.getElementById("deckSel");
+  if(dk&&[].some.call(sel.options,o=>o.value===dk)) sel.value=dk;
+  if(q.get("dir")==="en2ko"){ G.dir="en2ko";
+    document.getElementById("dirText").textContent="English → Korean"; }
+  if(q.get("star")==="1"){ G.starOnly=true;
+    document.getElementById("starText").textContent="on"; }
+})();
+
+renderChamp("champBox");
+renderVampSpr();
+requestAnimationFrame(frame);
+if("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
