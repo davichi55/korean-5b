@@ -1666,6 +1666,8 @@ deepStyle.textContent=
   "#deepPanel .dq .bl{display:inline-block;min-width:3.2em;border-bottom:3px solid #ffd85c;color:#ffd85c;margin:0 2px}"+
   "#deepPanel .dq .fill{color:#5be0a8;border-bottom-color:#5be0a8}"+
   "#deepPanel .dq .bad{color:#ff8fa3;border-bottom-color:#ff6b8a}"+
+  "#deepPanel .dmean{font:600 clamp(15px,2vw,18px) -apple-system,Segoe UI,Roboto,sans-serif;color:#ffe9a8;margin:6px 0 2px}"+
+  "#deepPanel .dmean b{font-family:"+KFONT+";color:#f2f4ff;margin-right:6px}"+
   "#deepPanel .dq.dok{border-color:rgba(91,224,168,.7);box-shadow:0 0 26px rgba(91,224,168,.25);margin-top:4px}"+
   "#deepPanel .den.dtr{font-size:16px;color:#d6f5e8}"+
   "#deepPanel .den{margin-top:7px;font:600 14px -apple-system,Segoe UI,Roboto,sans-serif;color:#9fb3d6}"+
@@ -1691,21 +1693,24 @@ function deepStep(step){
   const D=G.deep; D.step=step; D.review=false; D.phase="ask"; D.t=0; D.showEn=false; D.enAt=0;
   G.popups=G.popups.filter(q=>!q.big);              // banners would sit on top of the question
   const c=D.card, d=c.deep, kind=deepKind(c.pos);
+  const mean=c.en?shortEn(c.en):"";                 // Danny 2026-11-12: always show what the word means
   let opts, html;
   if(step===0){
     const right=deepCat(c.pos);
     opts=DEEP_CATS.map(x=>({label:x,sub:DEEP_CAT_EN[x],ok:x===right}));   // all 5, always in the same spots (Danny: no searching for where 동사 went)
-    html='<div class="dq" style="font-size:clamp(26px,4vw,38px)">'+esc(c.kr)+'</div><div class="den">어떤 품사예요? · what type of word is it?</div>';
+    html='<div class="dq" style="font-size:clamp(26px,4vw,38px)">'+esc(c.kr)+'</div>'+(mean?'<div class="dmean">= '+esc(mean)+'</div>':'')+
+      '<div class="den">어떤 품사예요? · what type of word is it?</div>';
   } else if(step===1){
     opts=shuffled([d.a,...d.w]).map(x=>({label:x,ok:x===d.a}));
     const q=esc(d.q).replace("___",'<span class="bl" id="deepBlank">&nbsp;?&nbsp;</span>');
     const ask=kind==="noun"?"알맞은 조사 · the right particle":kind==="verb"?"알맞은 형태 · the right form":"알맞은 말 · the word that fits";
-    html='<div class="dq">'+q+'</div><div class="den">'+ask+'</div>';
+    html=(mean?'<div class="dmean"><b>'+esc(c.kr)+'</b>= '+esc(mean)+'</div>':'')+'<div class="dq">'+q+'</div><div class="den">'+ask+'</div>';
   } else {
     D.s3=deepPair(c);
     opts=shuffled([{label:D.s3.ok,ok:true,en:D.s3.oke},{label:D.s3.bad,ok:false,en:D.s3.bade}]);
     D.enAt=performance.now()+DEEP_EN_AFTER;
-    html='<div class="den" style="margin:0 0 4px;font-size:16px;color:#eaf0fb"><b style="font-family:'+KFONT+'">'+esc(c.kr)+'</b> — 맞는 문장을 쏘세요 · shoot the correct sentence</div>';
+    html=(mean?'<div class="dmean"><b>'+esc(c.kr)+'</b>= '+esc(mean)+'</div>':'')+
+      '<div class="den" style="margin:0 0 4px;font-size:16px;color:#eaf0fb">맞는 문장을 쏘세요 · shoot the correct sentence</div>';
   }
   deepPanel.innerHTML='<div class="dstep">Deep strike · '+(step+1)+' / 3</div><div class="dpips">'+
     [0,1,2].map(i=>i<step?(D.pipOk&&D.pipOk[i]?"💎":"💔"):i===step?"🔷":"◇").join("")+'</div>'+html;
