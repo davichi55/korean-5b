@@ -418,7 +418,7 @@ function newRound(){
   // shuffle
   for(let i=chosen.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[chosen[i],chosen[j]]=[chosen[j],chosen[i]];}
   G.target=target; G.correctAns=ansOf(target);
-  G.promptWord=promptOf(target); G.promptPos=target.pos;
+  G.promptWord=promptOf(target); G.promptPos=target.pos; G.promptEx=phraseOf(target);
   // spawn monsters
   G.monsters=[];
   const top=H*0.26, bot=H*0.9, margin=64;
@@ -446,6 +446,12 @@ function newRound(){
   updateHUD();
 }
 
+// a one-syllable word or an adverb (헤, 꽉, 쭉 …) means little on its own: show its handout phrase under it (Danny 2026-11-12)
+function phraseOf(c){
+  const ph=(c.ex||"").split(" = ")[0].trim(), k=c.kr.replace(/s/g,"");
+  if(!ph||ph===c.kr||!ph.includes(c.kr)||/[.?!]$/.test(ph)||ph.length>18) return "";
+  return (k.length===1||c.pos==="부사") ? ph : "";
+}
 function updateHUD(){
   document.getElementById("lv").textContent=G.level;
   document.getElementById("score").textContent=G.score;
@@ -453,7 +459,7 @@ function updateHUD(){
   document.getElementById("uniqStat").innerHTML="Unique <b>"+G.uniq.size+"</b> / "+G.uniqTotal;
   document.getElementById("pword").textContent=G.promptWord||"";
   document.getElementById("plabel").textContent = G.dir==="ko2en"? "shoot the meaning" : "shoot the word";
-  document.getElementById("ppos").textContent = G.dir==="ko2en" && G.promptPos ? G.promptPos : "";
+  document.getElementById("ppos").textContent = G.dir!=="ko2en" ? "" : [G.promptPos,G.promptEx].filter(Boolean).join(" · ");
   const cs=document.getElementById("comboStat");
   if(G.combo>=2){cs.style.opacity=1;document.getElementById("combo").textContent=G.combo;}else cs.style.opacity=0;
   if(G.ultraRun){ // ultra HUD: bolt badge + progress instead of level/hearts
@@ -760,7 +766,7 @@ function startFrenzy(){
   if(G.state!=="playing")return;
   G.frenzyDone=true;
   G.frenzy={phase:"intro",t:0,kills:0,timeLeft:3.0,strikeT:0};
-  G.monsters=[]; G.promptWord=""; G.promptPos=""; updateHUD();
+  G.monsters=[]; G.promptWord=""; G.promptPos=""; G.promptEx=""; updateHUD();
   noise(0.5,0.3,700,60); // storm rolls in
   setTimeout(frenzyBegin,2400);
 }
@@ -789,7 +795,7 @@ function frenzyNextTarget(){
   if(!alive.length){endFrenzy(true);return;}
   const tm=pick(alive);
   G.target=tm.c;
-  G.promptWord=(G.dir==="ko2en")?tm.c.kr:shortEn(tm.c.en); G.promptPos=tm.c.pos;
+  G.promptWord=(G.dir==="ko2en")?tm.c.kr:shortEn(tm.c.en); G.promptPos=tm.c.pos; G.promptEx=phraseOf(tm.c);
   G.monsters.forEach(m=>m.correct=(m===tm));
   updateHUD();
 }
@@ -832,7 +838,7 @@ function startRedStorm(){
   if(G.state!=="playing")return;
   G.redDone=true;
   G.red={phase:"intro",t:0,timeLeft:10,strikeT:0,card:topMissCard()};
-  G.monsters=[]; G.promptWord=""; G.promptPos=""; updateHUD();
+  G.monsters=[]; G.promptWord=""; G.promptPos=""; G.promptEx=""; updateHUD();
   noise(0.5,0.3,500,50);
   setTimeout(redBegin,2400);
 }
@@ -855,7 +861,7 @@ function redBegin(){
       label:bad?ansOf(imp):good,correct:!bad,dead:false,born:0,hitFx:0,revealGood:false});
   }
   G.target=card;
-  G.promptWord=(G.dir==="ko2en")?card.kr:shortEn(card.en); G.promptPos=card.pos;
+  G.promptWord=(G.dir==="ko2en")?card.kr:shortEn(card.en); G.promptPos=card.pos; G.promptEx=phraseOf(card);
   updateHUD();
 }
 function redShoot(px,py){
