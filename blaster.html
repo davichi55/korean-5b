@@ -1653,7 +1653,7 @@ function deepStep(step){
   let opts, html;
   if(step===0){
     const right=deepCat(c.pos);
-    opts=shuffled([right,...shuffled(DEEP_CATS.filter(x=>x!==right)).slice(0,3)]).map(x=>({label:x,sub:DEEP_CAT_EN[x],ok:x===right}));
+    opts=DEEP_CATS.map(x=>({label:x,sub:DEEP_CAT_EN[x],ok:x===right}));   // all 5, always in the same spots (Danny: no searching for where 동사 went)
     html='<div class="dq" style="font-size:clamp(26px,4vw,38px)">'+esc(c.kr)+'</div><div class="den">어떤 품사예요? · what type of word is it?</div>';
   } else if(step===1){
     opts=shuffled([d.a,...d.w]).map(x=>({label:x,ok:x===d.a}));
@@ -1696,10 +1696,10 @@ function layoutCrystals(opts,wide){
   if(wide){                                       // two full-width sentence cards, stacked
     const w=Math.min(W*0.9,660), h=Math.max(76,Math.min(D.showEn?150:110,(bottom-top-gap)/2));   // taller once the English shows
     opts.forEach((o,i)=>D.crystals.push({...o,x:W/2-w/2,y:top+i*(h+gap),w,h,born:0,hit:0,dead:false,wrong:0,phase:rnd(0,6.28)}));
-  } else {                                         // 2 × 2 grid of word crystals
-    const w=Math.min(W*0.42,250), h=Math.max(62,Math.min(84,(bottom-top-gap)/2));
-    opts.forEach((o,i)=>{ const col=i%2,row=Math.floor(i/2);
-      D.crystals.push({...o,x:W/2+(col?gap/2:-gap/2-w),y:top+row*(h+gap),w,h,born:0,hit:0,dead:false,wrong:0,phase:rnd(0,6.28)}); });
+  } else {                                         // 2 × 2 grid of word crystals (round 1: 2 × 2 + the 5th centred below)
+    const rows=Math.ceil(opts.length/2), w=Math.min(W*0.42,250), h=Math.max(rows>2?52:62,Math.min(84,(bottom-top-gap*(rows-1))/rows));
+    opts.forEach((o,i)=>{ const col=i%2,row=Math.floor(i/2), alone=(i===opts.length-1&&col===0);
+      D.crystals.push({...o,x:alone?W/2-w/2:W/2+(col?gap/2:-gap/2-w),y:top+row*(h+gap),w,h,born:0,hit:0,dead:false,wrong:0,phase:rnd(0,6.28)}); });
   }
 }
 
