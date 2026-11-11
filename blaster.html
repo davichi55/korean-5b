@@ -38,6 +38,7 @@
   .uniqline b{color:#ffd85c}
   /* mastery: land 2x the deck size in correct hits */
   .mastery b{color:#37d18f}
+  .mastery.hidden{display:none}
   .mastery.done{background:linear-gradient(180deg,rgba(255,216,92,.24),rgba(255,216,92,.10));
     border-color:#ffd85c;color:#ffd85c;font-weight:800;letter-spacing:.6px;
     animation:mpulse 1.8s ease-in-out infinite}
@@ -201,8 +202,9 @@
       Hit the right one for points &amp; combo. Wrong answer or timeout costs a ❤.<br>
       <b>🪙 Champion:</b> each level-up pays coins. Every 5 levels your champion ambushes the foe —
       its wounds persist between runs, so keep upgrading until you finish it off!<br>
-      <b>🧠 Deep Strike:</b> classic, but each new word opens three crystal rounds — word type, the right
-      particle or form in a sentence, the correct sentence. A wrong crystal costs the combo, and the word comes back.<br>
+      <b>🧠 Deep Strike:</b> a board of up to 20 words — pick any word you like and answer its three crystal rounds:
+      word type, the right particle or form in a sentence, the correct sentence. Clear every word in the set; a slip
+      sends the word back to the pile. No timer, no lives, and your progress is saved.<br>
       <b>⚡ Ultra 100:</b> time attack — no timer, no lives, instant next word. Race to 100 correct;
       wrong clicks cost +2s. Beat your best time!<br>
       <b>📖 Marathon:</b> study room — every word in the set exactly once, no repeats, no lives.
@@ -1073,7 +1075,8 @@ function draw(){
       ctx.fillStyle="#8be0ff";ctx.fillText("설명",b.x,b.y+b.r+10);
       ctx.textBaseline="alphabetic";ctx.restore();
     }
-    if(G.deep) drawDeep();
+    if(G.board) boardBar();
+    if(G.deep) drawDeep(); else if(G.board) drawBoard();
     // laser + gun (color rolled per run: blue or red)
     if(G.laser>0){
       ctx.beginPath(); ctx.moveTo(W/2,H+10); ctx.lineTo(G.aim.x,G.aim.y);
@@ -1558,11 +1561,13 @@ document.getElementById("menuBtn").onclick=()=>{overScreen.classList.add("hidden
 })();
 
 // ---------- 🧠 DEEP STRIKE (5B only, 2026-11-10) ----------
-// Game mode "deep": classic rules, but after a correct hit on a word you have not met this run (or one you got wrong in
-// an earlier deep strike) the field freezes and three stationary crystals rounds follow:
+// Game mode "deep" (board version, 2026-11-11 — Danny: no racing, just pick words and clear the whole set):
+// up to 20 word tiles on the screen, no timer, no lives. Click any tile and three stationary crystal rounds follow:
 //   1 품사 — what type of word is it   2 문장 — the particle / verb form / word that fills the blank
 //   3 맞는 문장 — which of two sentences uses the word correctly
-// A wrong crystal costs the combo, not a heart; the word is marked and comes back a few rounds later.
+// A wrong crystal costs the combo; the word goes to the back of the pile and returns later (marked ↺).
+// A word is cleared when all three rounds are right; the run is done when every word is cleared. Progress per set is
+// saved (k5b_blaster_board_v1), so a long set can be finished over several sittings.
 // After round 3 the correct sentence stays up with its English until you shoot again, so you read at your own pace.
 // Round 3 rotates per word through 3 correct + 3 wrong sentences (one of each per strike, all six seen after 3 strikes),
 // so the answer can't become muscle memory. After 10 s without a shot, the English of both sentences fades in under them.
@@ -1768,10 +1773,10 @@ function deepNext(){
     G.deepBack.push({card:c,wait:3+Math.floor(Math.random()*3)});
     popup("다시 만나요! · it comes back",W/2,H*0.52,"#ffb0c0",false,1.1);
   }
-  const cont=D.cont;
+  const cont=D.cont, miss=D.miss;
   G.deep=null; deepPanel.style.display="none"; deepPanel.innerHTML="";
   updateHUD();
-  setTimeout(cont, D.miss?700:1000);
+  setTimeout(()=>cont(miss), miss?700:1000);
 }
 
 // ---- crystals: drawn on the canvas, stationary with a slow float ----
@@ -1857,7 +1862,7 @@ function drawDeep(){
 }
 
 function deepReset(){
-  G.deep=null; G.deepSeen=new Set(); G.deepBack=[]; G.deepStats={runs:0,mastered:0,steps:0,right:0};
+  G.deep=null; G.board=null; G.deepSeen=new Set(); G.deepBack=[]; G.deepStats={runs:0,mastered:0,steps:0,right:0};
   deepPanel.style.display="none"; deepPanel.innerHTML="";
 }
 // the HUD keeps saying "deep strike" while the crystals are up
@@ -1866,6 +1871,13 @@ updateHUD=function(){
   _updateHUD();
   if(G.deep){ document.getElementById("plabel").textContent="🧠 deep strike";
     document.getElementById("pword").textContent=G.deep.card.kr; document.getElementById("ppos").textContent=""; }
+  else if(G.board){ document.getElementById("plabel").textContent="아무 단어나 고르세요 · pick any word";
+    document.getElementById("pword").textContent=""; document.getElementById("ppos").textContent=""; }
+  if(G.board){ const B=G.board;
+    document.getElementById("lv").textContent="🧠";
+    document.getElementById("hearts").textContent=B.cleared.size+"/"+B.total;
+    document.getElementById("uniqStat").innerHTML="남은 단어 <b>"+(B.total-B.cleared.size)+"</b>개";
+    document.getElementById("masteryHud").classList.add("hidden"); }
 };
 
 // end-of-run line
@@ -1877,6 +1889,140 @@ gameOver=function(){
     el.textContent=(el.textContent?el.textContent+"  ·  ":"")+"🧠 deep strikes "+s.runs+" · 💎 mastered "+s.mastered+" · "+s.right+"/"+s.steps+" crystals";
   }
 };
+
+// ---------- the board: pick any word, clear the whole set ----------
+const BOARD_KEY="k5b_blaster_board_v1", BOARD_MAX=20;
+let BOARDSAVE=(function(){try{const o=JSON.parse(localStorage.getItem(BOARD_KEY)||"{}"); if(o&&typeof o==="object")return o;}catch(e){} return {};})();
+function saveBoard(){ const B=G.board; if(!B) return;
+  if(B.cleared.size>=B.total) delete BOARDSAVE[B.key];
+  else BOARDSAVE[B.key]={cleared:[...B.cleared],wrongs:B.wrongs,secs:boardSecs(),score:G.score};
+  try{localStorage.setItem(BOARD_KEY,JSON.stringify(BOARDSAVE));}catch(e){}
+}
+function boardSecs(){ const B=G.board; return B.secs0+Math.round((Date.now()-B.t0)/1000); }
+function boardTile(card){ return card?{card,born:0,phase:rnd(0,6.28)}:null; }
+function boardStart(fresh){
+  const key=G.deck+(G.starOnly?"|star":""), seen=new Set(), all=[];
+  for(const c of G.pool) if(c.deep&&!seen.has(c.kr)){ seen.add(c.kr); all.push(c); }
+  const sv=!fresh&&BOARDSAVE[key], done=new Set(sv?sv.cleared.filter(k=>seen.has(k)):[]);
+  const left=shuffled(all.filter(c=>!done.has(c.kr)));
+  G.board={key,total:all.length,cleared:done,left,slots:[],back:new Set(),wrongs:sv?sv.wrongs||0:0,t0:Date.now(),secs0:sv?sv.secs||0:0};
+  const B=G.board, n=Math.min(BOARD_MAX,left.length);
+  for(let i=0;i<n;i++) B.slots.push(boardTile(B.left.shift()));
+  if(sv) G.score=sv.score||0;
+  G.monsters=[]; G.resolving=true; G.target=null; G.promptWord="";   // no timer, no lives
+  updateHUD();
+  setTimeout(()=>{ G.popups=G.popups.filter(q=>!q.big);              // drop the "습격!" banner
+    if(done.size) popup("이어하기 · "+done.size+"/"+B.total+" cleared",W/2,H*0.5,"#8be0ff",true,Math.min(1,W/560)); },0);
+}
+const _newRound=newRound;
+newRound=function(){
+  if(G.mode==="deep"&&G.state==="playing"){ if(!G.board) boardStart(false); return; }
+  _newRound();
+};
+// tile grid: up to 5 columns, under the HUD, above the two buttons; a tile keeps its spot for the whole run
+function boardRects(){
+  const B=G.board, n=B.slots.length, cvr=cv.getBoundingClientRect();
+  const top=document.getElementById("tbarWrap").getBoundingClientRect().bottom-cvr.top+22, bottom=H-70, side=16;
+  const cols=Math.min(n,W>=1000?5:W>=640?4:3), rows=Math.ceil(n/cols), gap=W<500?8:12;
+  const w=Math.min(210,(W-2*side-gap*(cols-1))/cols), h=Math.min(86,Math.max(40,(bottom-top-gap*(rows-1))/rows));
+  const out=[];
+  for(let i=0;i<n;i++){ const row=Math.floor(i/cols), inRow=Math.min(cols,n-row*cols), col=i%cols;
+    const x0=(W-(inRow*w+(inRow-1)*gap))/2; out.push({x:x0+col*(w+gap),y:top+row*(h+gap),w,h}); }
+  return out;
+}
+function boardButtons(){ const y=H-52, w=Math.min(190,(W-102)/2);   // left one clears the 🔊 button
+  return [{id:"quit",x:70,y,w,h:36,label:"⏏ 저장하고 메뉴로 · save & menu"},{id:"over",x:W-16-w,y,w,h:36,label:"↺ 처음부터 · start over"}]; }
+function inRect(r,px,py){ return px>=r.x&&px<=r.x+r.w&&py>=r.y&&py<=r.y+r.h; }
+function boardQuit(){
+  saveBoard(); G.board=null; G.state="menu";
+  hud.classList.add("hidden"); muteBtn.classList.add("hidden"); startScreen.classList.remove("hidden"); renderChamp("champBox");
+}
+const _shootAt=shootAt;
+shootAt=function(px,py){
+  if(G.state==="playing"&&G.board&&!G.deep&&!G.info){ boardShoot(px,py); return; }
+  _shootAt(px,py);
+};
+function boardShoot(px,py){
+  const B=G.board;
+  for(const b of boardButtons()) if(inRect(b,px,py)){
+    if(b.id==="quit") boardQuit();
+    else if(confirm("이 세트를 처음부터 다시 할까요? · Start this set over from zero?")){
+      delete BOARDSAVE[B.key]; try{localStorage.setItem(BOARD_KEY,JSON.stringify(BOARDSAVE));}catch(e){}
+      G.score=0; G.combo=0; boardStart(true); }
+    return;
+  }
+  if(B.busy) return;
+  sShoot(); G.laser=1;
+  const rs=boardRects(), i=rs.findIndex((r,j)=>B.slots[j]&&inRect(r,px,py));
+  if(i<0) return;
+  const card=B.slots[i].card;
+  shatter(rs[i]); sGlass(0); B.slots[i]=null; B.busy=true;
+  startDeep(card, miss=>boardAfter(i,card,miss));
+}
+function boardAfter(i,card,miss){
+  const B=G.board; if(!B) return;
+  B.busy=false; G.resolving=true;
+  if(miss){ B.wrongs++; B.back.add(card.kr); B.left.push(card); }   // back of the pile, comes round again
+  else { B.cleared.add(card.kr); B.back.delete(card.kr); }
+  B.slots[i]=boardTile(B.left.shift());
+  saveBoard(); updateHUD();
+  if(B.cleared.size>=B.total) setTimeout(finishBoard,600);
+}
+function finishBoard(){
+  const B=G.board; if(!B) return;
+  const secs=boardSecs(), mm=Math.floor(secs/60), ss=String(secs%60).padStart(2,"0"), coins=30+Math.floor(B.total/10);
+  G.board=null; G.state="over";
+  CH.coins+=coins; saveCH(); sMastered();
+  document.getElementById("finalScore").textContent="🧠 "+B.total;
+  document.getElementById("finalLv").textContent="DEEP STRIKE 완주!";
+  document.getElementById("finalHits").textContent=B.total;
+  document.getElementById("finalUniq").textContent=B.total+"/"+B.total;
+  document.getElementById("finalCombo").textContent=G.bestCombo;
+  document.getElementById("bestScore").textContent=mm+":"+ss;
+  document.getElementById("missLine").textContent="점수 "+G.score+" · 틀려서 다시 "+B.wrongs+"회 · 걸린 시간 "+mm+"분 "+ss+"초 · +"+coins+"🪙";
+  renderChamp("champBox2");
+  hud.classList.add("hidden"); overScreen.classList.remove("hidden");
+}
+function boardBar(){
+  const B=G.board, tb=document.getElementById("tbar");
+  tb.style.width=(B.cleared.size/Math.max(1,B.total)*100)+"%"; tb.style.background="linear-gradient(90deg,#a98bff,#8be0ff)";
+}
+function drawBoard(){
+  const B=G.board, rs=boardRects();
+  rs.forEach((r,i)=>{
+    const t=B.slots[i]; if(!t) return;
+    t.born=Math.min(1,t.born+1/15);
+    const back=B.back.has(t.card.kr), y=r.y+Math.sin(G.lastT/900+t.phase)*2, x=r.x, w=r.w, h=r.h, cx=x+w/2, cy=y+h/2;
+    const hover=inRect({x,y,w,h},G.aim.x,G.aim.y), s=0.85+0.15*t.born;
+    ctx.save(); ctx.globalAlpha=t.born;
+    ctx.translate(cx,cy); ctx.scale(s,s); ctx.translate(-cx,-cy);
+    ctx.shadowColor=hover?"rgba(139,224,255,1)":back?"rgba(255,120,150,.8)":"rgba(170,130,255,.7)";
+    ctx.shadowBlur=hover?22:10;
+    const gr=ctx.createLinearGradient(x,y,x+w,y+h);
+    gr.addColorStop(0,back?"#4a2350":"#3a2a78"); gr.addColorStop(1,"#14183c");
+    crystalPath(x,y,w,h); ctx.fillStyle=gr; ctx.fill();
+    ctx.shadowBlur=0; ctx.lineWidth=2; ctx.strokeStyle=hover?"#bfefff":back?"#ff9bb4":"#a98bff"; ctx.stroke();
+    ctx.globalAlpha=t.born*0.18; ctx.fillStyle="#fff";
+    ctx.beginPath(); ctx.moveTo(x+10,y+3); ctx.lineTo(x+w*0.45,y+3); ctx.lineTo(x+w*0.3,y+h*0.4); ctx.lineTo(x+4,y+h*0.4); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha=t.born; ctx.fillStyle="#f2f4ff"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    let fs=Math.min(24,Math.max(13,h*0.34)); ctx.font="700 "+fs+"px "+KFONT;
+    while(ctx.measureText(t.card.kr).width>w-16&&fs>12){ fs--; ctx.font="700 "+fs+"px "+KFONT; }
+    const lines=ctx.measureText(t.card.kr).width>w-16?wrapLines(t.card.kr,w-14).slice(0,2):[t.card.kr];
+    lines.forEach((ln,j)=>ctx.fillText(ln,cx,cy+(j-(lines.length-1)/2)*fs*1.2));
+    if(back){ ctx.font="700 13px -apple-system,Segoe UI,Roboto,sans-serif"; ctx.fillStyle="#ff9bb4"; ctx.fillText("↺",x+w-12,y+12); }
+    ctx.textBaseline="alphabetic"; ctx.restore();
+  });
+  for(const b of boardButtons()){
+    const hover=inRect(b,G.aim.x,G.aim.y);
+    ctx.save(); roundRect(b.x,b.y,b.w,b.h,10);
+    ctx.fillStyle=hover?"rgba(60,70,120,.9)":"rgba(20,26,52,.85)"; ctx.fill();
+    ctx.strokeStyle=hover?"#bfefff":"rgba(169,139,255,.6)"; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle="#d8def5"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    let fs=13; ctx.font="600 "+fs+"px "+KFONT;
+    while(ctx.measureText(b.label).width>b.w-14&&fs>9){ fs--; ctx.font="600 "+fs+"px "+KFONT; }
+    ctx.fillText(b.label,b.x+b.w/2,b.y+b.h/2+1); ctx.textBaseline="alphabetic"; ctx.restore();
+  }
+}
 
 renderChamp("champBox");
 renderVampSpr();
