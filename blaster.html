@@ -1077,6 +1077,7 @@ function draw(){
     }
     if(G.board) boardBar();
     if(G.deep) drawDeep(); else if(G.board) drawBoard();
+    if(G.fxs&&G.fxs.length) drawFxSprites();
     // laser + gun (color rolled per run: blue or red)
     if(G.laser>0){
       ctx.beginPath(); ctx.moveTo(W/2,H+10); ctx.lineTo(G.aim.x,G.aim.y);
@@ -1610,11 +1611,46 @@ pickTarget=function(){
 };
 
 // ---- audio: glass ping on a clean shatter, dull crack on a wrong one ----
-function sGlass(step){ noise(0.28,0.32,7000,900);
+// sounds made with fal Stable Audio 2.5 and glow sprites made with FLUX (fx/gen.js → site/fx/, 2026-11-11);
+// until a file has loaded (or offline) the old synth sounds play instead
+const FX_SND={}, FXI={};
+["shatter","crack","pick","mastered","complete"].forEach(n=>{
+  fetch("fx/"+n+".mp3").then(r=>r.ok?r.arrayBuffer():null).then(b=>{ if(b){ FX_SND[n]={raw:b}; fxWarm(); } }).catch(()=>{}); });
+["burst","rays","gem"].forEach(n=>{ const i=new Image(); i.src="fx/"+n+".webp"; FXI[n]=i; });
+FXI.gem.onload=function(){                         // the gem sits ON the rays: black → transparent so it can draw solid
+  try{ const c=document.createElement("canvas"); c.width=this.naturalWidth; c.height=this.naturalHeight;
+    const x=c.getContext("2d"); x.drawImage(this,0,0); const im=x.getImageData(0,0,c.width,c.height), d=im.data;
+    for(let i=0;i<d.length;i+=4){ const a=Math.max(d[i],d[i+1],d[i+2]); if(a){ d[i]=d[i]*255/a; d[i+1]=d[i+1]*255/a; d[i+2]=d[i+2]*255/a; } d[i+3]=Math.min(255,a*1.25); }
+    x.putImageData(im,0,0); c.complete=true; c.naturalWidth=c.width; FXI.gem=c; }catch(e){} };
+function fxWarm(){ const a=AC; if(!a) return;          // decode once the game has its AudioContext (after the START click)
+  for(const s of Object.values(FX_SND)) if(!s.dec) s.dec=a.decodeAudioData(s.raw.slice(0)).then(b=>{s.buf=b;}).catch(()=>{}); }
+function playFx(n,rate,vol){
+  if(muted) return true; const a=actx(), s=FX_SND[n]; if(!a||!s) return false;
+  if(!s.buf){ fxWarm(); return false; }
+  const src=a.createBufferSource(), g=a.createGain(); src.buffer=s.buf; src.playbackRate.value=rate||1;
+  g.gain.value=vol==null?1:vol; src.connect(g); g.connect(a.destination); src.start(); return true;
+}
+G.fxs=[];
+// additive sprite (black = invisible): grows from grow[0] to grow[1], fades after fadeAt of its life
+function fxSprite(n,x,y,size,o){ G.fxs.push(Object.assign({n,x,y,size,t:0,life:.5,rot:rnd(0,6.28),spin:0,grow:[.6,1.3],fadeAt:.3,alpha:1},o||{})); }
+function drawFxSprites(){
+  const now=performance.now(), dt=Math.min(.05,(now-(G.fxLt||now))/1000); G.fxLt=now;
+  G.fxs=G.fxs.filter(f=>(f.t+=dt)<f.life);
+  for(const f of G.fxs){
+    const img=FXI[f.n]; if(!img||!img.complete||!img.naturalWidth) continue;
+    const p=f.t/f.life, g0=f.grow[0], g1=f.grow[1];
+    let e; if(f.ease==="back"){ const q=Math.min(1,p/0.3)-1; e=1+2.70158*q*q*q+1.70158*q*q; } else e=1-Math.pow(1-p,3);
+    const S=f.size*(g0+(g1-g0)*e), al=p<f.fadeAt?1:1-(p-f.fadeAt)/(1-f.fadeAt);
+    ctx.save(); if(!(img instanceof HTMLCanvasElement)) ctx.globalCompositeOperation="lighter"; ctx.globalAlpha=Math.max(0,al)*f.alpha;
+    ctx.translate(f.x,f.y); ctx.rotate(f.rot+f.spin*f.t); ctx.drawImage(img,-S/2,-S/2,S,S); ctx.restore();
+  }
+}
+function sGlass(step){ if(playFx("shatter",[1,1.1,1.2][step]||1,.9)) return;
+  noise(0.28,0.32,7000,900);
   const base=[1319,1568,1760][step]||1319;
   [base,base*1.5,base*2].forEach((f,i)=>setTimeout(()=>beep(f,.16,"triangle",.07),i*55)); }
-function sCrack(){ noise(0.22,0.3,900,90); beep(110,.3,"sawtooth",.08); }
-function sMastered(){ sLevel(); setTimeout(()=>[1047,1319,1568,2093].forEach((f,i)=>setTimeout(()=>beep(f,.22,"triangle",.09),i*70)),240); }
+function sCrack(){ if(playFx("crack",1,.9)) return; noise(0.22,0.3,900,90); beep(110,.3,"sawtooth",.08); }
+function sMastered(){ if(playFx("mastered",1,1)) return; sLevel(); setTimeout(()=>[1047,1319,1568,2093].forEach((f,i)=>setTimeout(()=>beep(f,.22,"triangle",.09),i*70)),240); }
 
 // ---- the question panel (DOM, so long Korean sentences wrap properly) ----
 const deepPanel=document.createElement("div");
@@ -1727,6 +1763,7 @@ function deepShoot(px,py){
   if(cr.ok){
     D.pipOk[D.step]=true; G.deepStats.right++;
     cr.dead=true; shatter(cr); sGlass(D.step);
+    fxSprite("burst",cx,cy,Math.max(cr.w,cr.h)*(D.step===2?1.5:2.6),{life:.55,grow:[.45,1.35],fadeAt:.3,spin:1.4});
     G.combo++; G.bestCombo=Math.max(G.bestCombo,G.combo);
     const gain=(60+D.step*40)+G.combo*8; G.score+=gain;
     popup("+"+gain+(G.combo>=5?" ×"+G.combo:""),cx,cy,G.combo>=5?"#ffd85c":"#5be0a8",false,1+Math.min(G.combo,10)*0.06);
@@ -1765,6 +1802,9 @@ function deepNext(){
     const bonus=300+G.level*20; G.score+=bonus;
     popup("💎 MASTERED  +"+bonus,W/2,H*0.52,"#ffd85c",true,Math.min(1.15,W/600));
     sMastered(); G.shake=18; G.flash=Math.min(1,G.flash+.8);
+    const m=Math.min(W,H);
+    fxSprite("rays",W/2,H*0.64,m*0.95,{life:1.7,grow:[.35,1.25],fadeAt:.45,spin:.5,alpha:.9});
+    fxSprite("gem",W/2,H*0.64,m*0.4,{life:1.6,grow:[.15,1],fadeAt:.65,ease:"back",rot:0});
     for(let i=0;i<3;i++) G.rings.push({x:W/2,y:H*0.6,r:6+i*40,max:380,life:1,color:i?"#c9a8ff":"#ffd85c"});
     for(let i=0;i<40;i++){const a=rnd(0,6.28),s=rnd(160,520);
       G.particles.push({x:W/2,y:H*0.6,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,color:pick(["#c9a8ff","#8be0ff","#ffd85c","#ffffff"]),r:rnd(2,5),g:.5,spark:Math.random()<.4});}
@@ -1862,7 +1902,7 @@ function drawDeep(){
 }
 
 function deepReset(){
-  G.deep=null; G.board=null; G.deepSeen=new Set(); G.deepBack=[]; G.deepStats={runs:0,mastered:0,steps:0,right:0};
+  G.deep=null; G.board=null; G.fxs=[]; G.deepSeen=new Set(); G.deepBack=[]; G.deepStats={runs:0,mastered:0,steps:0,right:0};
   deepPanel.style.display="none"; deepPanel.innerHTML="";
 }
 // the HUD keeps saying "deep strike" while the crystals are up
@@ -1910,6 +1950,7 @@ function boardStart(fresh){
   for(let i=0;i<n;i++) B.slots.push(boardTile(B.left.shift()));
   if(sv) G.score=sv.score||0;
   G.monsters=[]; G.resolving=true; G.target=null; G.promptWord="";   // no timer, no lives
+  fxWarm();
   updateHUD();
   setTimeout(()=>{ G.popups=G.popups.filter(q=>!q.big);              // drop the "습격!" banner
     if(done.size) popup("이어하기 · "+done.size+"/"+B.total+" cleared",W/2,H*0.5,"#8be0ff",true,Math.min(1,W/560)); },0);
@@ -1956,7 +1997,8 @@ function boardShoot(px,py){
   const rs=boardRects(), i=rs.findIndex((r,j)=>B.slots[j]&&inRect(r,px,py));
   if(i<0) return;
   const card=B.slots[i].card;
-  shatter(rs[i]); sGlass(0); B.slots[i]=null; B.busy=true;
+  shatter(rs[i]); if(!playFx("pick",1,.8)) sGlass(0); B.slots[i]=null; B.busy=true;
+  fxSprite("burst",rs[i].x+rs[i].w/2,rs[i].y+rs[i].h/2,Math.max(rs[i].w,rs[i].h)*2.2,{life:.5,grow:[.4,1.2],fadeAt:.3,spin:1.2});
   startDeep(card, miss=>boardAfter(i,card,miss));
 }
 function boardAfter(i,card,miss){
@@ -1972,7 +2014,7 @@ function finishBoard(){
   const B=G.board; if(!B) return;
   const secs=boardSecs(), mm=Math.floor(secs/60), ss=String(secs%60).padStart(2,"0"), coins=30+Math.floor(B.total/10);
   G.board=null; G.state="over";
-  CH.coins+=coins; saveCH(); sMastered();
+  CH.coins+=coins; saveCH(); if(!playFx("complete",1,1)) sMastered();
   document.getElementById("finalScore").textContent="🧠 "+B.total;
   document.getElementById("finalLv").textContent="DEEP STRIKE 완주!";
   document.getElementById("finalHits").textContent=B.total;
